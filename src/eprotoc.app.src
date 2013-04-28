@@ -1,0 +1,9 @@
+{application, eprotoc,
+ [
+  {description, "Erlang proto parser and code generator"},
+  {vsn, "0.0.1"},
+  {registered, []},
+  {applications, []},
+  {env, []}
+ ]
+}.
