@@ -61,9 +61,9 @@ pop_64bits(<< Value:64, Rest/binary >>) ->
 %% type, and value}. In the event that the value is a repeated
 %% field, the value is instead a list of raw decoded messages.
 %% O(n)
--spec encode_message(orddict:orddict()) -> list().
+-spec encode_message(list()) -> list().
 encode_message(Message) ->
-    lists:reverse(encode_message(orddict:to_list(Message), [])).
+    lists:reverse(encode_message(Message, [])).
 
 %% hidden
 -spec encode_message(list(), list()) -> list().

@@ -3,7 +3,6 @@
 -export([
          generate_parser/0,
          generate_code/1,
-         generate_field/5,
          parse_file/1,
          reserved_words/1,
          atom_to_name/1
@@ -39,17 +38,18 @@ peel({[{enum, Enum, Fields}|Enums], MFs}, Level, Acc) ->
 peel({[], [{message, Message, {Enums, Fields}}|MFs]}, Level, Acc) ->
     MessageName = atom_to_name(Message),
     Level1 = Level ++ "__" ++ MessageName,
-    Acc1 = peel({Enums, Fields}, Level1, Acc),
-    peel({[], MFs}, Level, Acc1);
-peel({[], [{field, Rule, Type, AtomName, Num, Opts}|MFs]}, Level, Acc) ->
+    Text = generate_message(Fields),
+    Acc2 = peel({Enums, Fields}, Level1, [{Level, Text}|Acc]),
+    peel({[], MFs}, Level, Acc2);
+peel({[], [{field, _Rule, _Type, AtomName, Num, Opts}|MFs]}, Level, Acc) ->
     Name = atom_to_list(AtomName),
-    Text = generate_field(Rule, Type, Name, Num, Opts),
+    Text = generate_field(Name, Num, Opts),
     Acc1 = [{Level, Text}|Acc],
     peel({[], MFs}, Level, Acc1).
 
 %% @doc Supply getter and setter functions for the specified field
-generate_field(Rule, Type, Name, Num, Opts) ->
-    NumString = integer_to_list(Num),
+generate_field(Name, Num, Opts) ->
+    N = integer_to_list(Num),
     Default = proplists:get_value(default, Opts),
     DefaultString = case Default of
                         D when is_atom(D) ->
@@ -62,29 +62,52 @@ generate_field(Rule, Type, Name, Num, Opts) ->
                             float_to_list(D)
                     end,
     "g_" ++ Name ++ "(Data) ->\n"
-        "    case lists:keysearch(" ++ NumString ++ ", 1, Data) of\n"
-        "        {value, {_, Value}} -> Value;\n"
+        "    case lists:keysearch(" ++ N ++ ", 1, Data) of\n"
+        "        {value, {_, _, Value}} -> Value;\n"
         "        false -> " ++ DefaultString ++ "\n"
         "    end.\n"
         "s_" ++ Name ++ "(Data, Value) ->\n"
-        "    lists:keystore(" ++ NumString ++ ", 1, Data, {" ++ NumString ++ ", Value}).\n".
+        "    lists:keystore(" ++ N ++ ", 1, Data, {" ++ N ++ ", get_type(Data), Value}).\n\n".
 
 generate_enum(Name, [{FieldAtom, Value}], Acc) ->
     Field = atom_to_name(FieldAtom),
-    Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ".\n";
+    Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ".\n\n";
 generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
     Field = atom_to_name(FieldAtom),
     Acc1 = Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ";\n",
     generate_enum(Name, Fields, Acc1).
 
-generate_messages(Messages) ->
-    lists:map(fun({message, Message, {Enums, Fields}}) ->
-                      MessageName = atom_to_name(Message),
-                      generate_message(MessageName, Enums, Fields, [])
-              end, Messages).
+generate_message(Fields) ->
+    FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
+    generate_message_rules(FieldsOnly, "") ++
+        generate_message_types(FieldsOnly, "") ++
+        "-spec decode(Payload :: binary()) -> list().\n"
+        "decode(Payload) ->\n"
+        "    eprotoc:decode(Data).\n\n"
+        "-spec encode(Data :: list()) -> iolist().\n"
+        "encode(Data) ->\n"
+        "    eprotoc:encode(Data).\n\n".
 
-generate_message(Name, [Enum|Enums], Fields, Acc) ->
-    ok.
+%% No fields in message, nothing to do.
+generate_message_rules([], _) -> "";
+generate_message_rules([{field, Rule, _, FieldAtom, _, _}], Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc ++ "get_rule(" ++ Name ++ ") -> " ++ atom_to_list(Rule) ++ ".\n\n";
+generate_message_rules([{field, Rule, _, FieldAtom, _, _}|Rest], Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc1 = Acc ++ "get_rule(" ++ Name ++ ") -> " ++ atom_to_list(Rule) ++ ";\n",
+    generate_message_rules(Rest, Acc1).
+
+%% No fields in message, nothing to do.
+generate_message_types([], _) -> "";
+generate_message_types([{field, _, Type, FieldAtom, _, _}], Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc ++ "get_type(" ++ Name ++ ") -> " ++ atom_to_list(Type) ++ ".\n\n";
+generate_message_types([{field, _, Type, FieldAtom, _, _}|Rest], Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc1 = Acc ++ "get_type(" ++ Name ++ ") -> " ++ atom_to_list(Type) ++ ";\n",
+    generate_message_types(Rest, Acc1).
+
 
 reserved_words(package) -> true;
 reserved_words(message) -> true;
