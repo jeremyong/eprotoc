@@ -8,7 +8,7 @@ fields field field_rule field_num field_type field_name
 options option.
 
 Terminals
-';' '=' '{' '}' '[' ']' '(' ')' ','
+';' '=' '{' '}' '[' ']' ','
 package default packed message enum atom string integer float var bool.
 
 Rootsymbol proto.
@@ -50,6 +50,10 @@ options -> option ',' options : ['$1'|'$3'].
 
 option -> packed '=' atom : {packed, value_of('$3')}.
 option -> default '=' integer : {default, value_of('$3')}.
+option -> default '=' float : {default, value_of('$3')}.
+option -> default '=' string : {default, value_of('$3')}.
+option -> default '=' var : {default, value_of('$3')}.
+option -> default '=' bool : {default, value_of('$3')}.
 
 p_enum -> enum enum_name '{' enum_fields '}' : {enum, '$2', '$4'}.
 

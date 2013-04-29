@@ -11,11 +11,18 @@ generate_parser() ->
 
 parse_file(File) ->
     {ok, Contents} = file:read_file(File),
-    {ok, Tokens, _} = erl_scan:string(
-                        binary_to_list(Contents), 1,
+    StripComments = re:replace(Contents, "/\\*([^*]|\\*+[^*/])*\\*+/", "",
+                               [global, {return, list}]),
+    StripComments1 = re:replace(StripComments, "//.*\\n", "",
+                                [global, {return, list}]),
+    {ok, Tokens, _} = erl_scan:string(StripComments1, 1,
                         {reserved_word_fun, fun reserved_words/1}
                        ),
     proto_grammar:parse(Tokens).
+
+generate_code(File) ->
+    {ok, Proto} = parse_file(File),
+    ok.
 
 reserved_words(package) -> true;
 reserved_words(message) -> true;

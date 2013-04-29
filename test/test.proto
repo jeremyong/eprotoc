@@ -1,6 +1,10 @@
+// This is a single line comment
 package TestProto;
 
 enum TestEnum {
+    /* this is a multiline comment
+       continuing comment
+     */
     FIRST = 0;
     SECOND = 1;
     THIRD = 2;
@@ -17,6 +21,7 @@ message Test {
     optional uint32 d = 4[default = 2];
     repeated uint32 e = 5[default = 0, packed = true];
 
+    // embedded single line comment
     message NestedTest {
         optional uint32 foo = 1;
         optional uint32 bar = 2;
@@ -31,4 +36,8 @@ message Test {
 
 message SimpleMessage {
     required uint32 field = 1;
+    /*
+      The following field shouldn't show up
+      optional uint32 nonexistent_field = 2;
+     */
 }
