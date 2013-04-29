@@ -1,0 +1,34 @@
+package TestProto;
+
+enum TestEnum {
+    FIRST = 0;
+    SECOND = 1;
+    THIRD = 2;
+}
+
+message Test {
+    enum EmbeddedEnum {
+        Foo = 0;
+        Bar = 1;
+    }
+    required uint32 a = 1;
+    optional sint32 b = 2;
+    repeated string c = 3;
+    optional uint32 d = 4[default = 2];
+    repeated uint32 e = 5[default = 0, packed = true];
+
+    message NestedTest {
+        optional uint32 foo = 1;
+        optional uint32 bar = 2;
+        message MoreNesting {
+            enum VeryEmbeddedEnum {
+                Hello = 0;
+                World = 1;
+            }
+        }
+    }
+}
+
+message SimpleMessage {
+    required uint32 field = 1;
+}
