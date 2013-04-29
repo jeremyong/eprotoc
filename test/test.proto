@@ -17,9 +17,10 @@ message Test {
     }
     required uint32 a = 1;
     optional sint32 b = 2;
-    repeated string c = 3;
+    repeated string c = 3[default = "test"];
     optional uint32 d = 4[default = 2];
     repeated uint32 e = 5[default = 0, packed = true];
+    optional float f = 6[default = 2.3];
 
     // embedded single line comment
     message NestedTest {
