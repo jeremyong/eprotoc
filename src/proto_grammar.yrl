@@ -66,7 +66,7 @@ enum_field ->
 enum_name -> atom : value_of('$1').
 enum_name -> var : value_of('$1').
 
-enum_value -> integer : value_of('$1').
+enum_value -> integer : integer_to_list(value_of('$1')).
 
 Erlang code.
 add_first(A, {As, Bs}) ->

@@ -5,9 +5,9 @@ enum TestEnum {
     /* this is a multiline comment
        continuing comment
      */
-    FIRST = 0;
-    SECOND = 1;
-    THIRD = 2;
+    First = 0;
+    Second = 1;
+    Third = 2;
 }
 
 message Test {
