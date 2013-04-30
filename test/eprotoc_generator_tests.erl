@@ -15,7 +15,9 @@ eprotoc_generator_test_() ->
       fun test_encode_nested_message/0,
       fun test_decode_nested_message/0,
       fun test_encode_enum_message/0,
-      fun test_decode_enum_message/0
+      fun test_decode_enum_message/0,
+      fun test_encode_repeated_message/0,
+      fun test_decode_repeated_message/0
      ]}.
 
 test_encode_message() ->
@@ -52,4 +54,15 @@ test_decode_enum_message() ->
     Payload = <<8,150,1>>,
     Result = test__test2:decode(Payload),
     Message = [{b, {1, {enum, fun test__test2:foo_enum/1}, bar}}],
+    ?assertEqual(Message, Result).
+
+test_encode_repeated_message() ->
+    Message = [{d, [{1, uint32, 150}, {1, uint32, 150}]}],
+    Result = list_to_binary(test__test4:encode(Message)),
+    ?assertEqual(<<8,150,1,8,150,1>>, Result).
+
+test_decode_repeated_message() ->
+    Payload = <<8,150,1,8,150,1>>,
+    Result = test__test4:decode(Payload),
+    Message = [{d, [{1, uint32, 150}, {1, uint32, 150}]}],
     ?assertEqual(Message, Result).

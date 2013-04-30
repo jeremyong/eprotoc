@@ -73,8 +73,8 @@ encode_message(Message) ->
 encode_message([], Acc) -> Acc;
 encode_message([{_, Values}|Rest], Acc)
   when is_list(Values) ->
-    Res = lists:map(fun(Elem) ->
-                            encode_message(Elem)
+    Res = lists:map(fun({FNum, Type, Value}) ->
+                            encode_value(FNum, Type, Value)
                     end, Values),
     encode_message(Rest, [Res|Acc]);
 encode_message([{_, {FNum, Type, Value}}|Rest], Acc) ->

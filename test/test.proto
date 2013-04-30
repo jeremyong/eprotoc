@@ -14,3 +14,7 @@ message Test2 {
 message Test3 {
     required Test1 c = 3;
 }
+
+message Test4 {
+    repeated uint32 d = 1;
+}
