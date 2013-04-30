@@ -85,12 +85,15 @@ encode_message([{_, {FNum, Type, Value}}|Rest], Acc) ->
 -spec encode_value(integer(), atom() | function(),
                    binary() | integer() | float()) ->
     iolist().
-encode_value(FieldNum, EncodeFun, Data) when is_function(EncodeFun) ->
+encode_value(FieldNum, {enum, EncodeFun}, Data) ->
+    Num = EncodeFun(Data),
+    [encode_varint((FieldNum bsl 3) bor 0),encode_varint(Num)];
+encode_value(FieldNum, {message, EncodeFun}, Data) ->
     %% For message types, an encoding function is provided and the
     %% wire type is 2 for a fixed size packet
     Message = EncodeFun(Data),
     Size = iolist_size(Message),
-    [encode_varint((FieldNum bsl 3) bor 2)|[encode_varint(Size)|Message]];
+    [encode_varint((FieldNum bsl 3) bor 2),encode_varint(Size),Message];
 encode_value(FieldNum, Type, Data) ->
     WireType = wire_type(Type),
     Fun = wire_encode_fun(Type),

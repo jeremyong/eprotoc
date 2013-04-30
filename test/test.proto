@@ -8,7 +8,7 @@ message Test2 {
     enum Foo {
         Bar = 150;
     }
-    required Foo b = 2;
+    required Foo b = 1;
 }
 
 message Test3 {
