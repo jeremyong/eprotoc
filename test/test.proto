@@ -16,11 +16,13 @@ message Test {
         Bar = 1;
     }
     required uint32 a = 1;
-    optional sint32 b = 2;
+    optional SimpleMessage b = 2;
     repeated string c = 3[default = "test"];
     optional uint32 d = 4[default = 2];
     repeated uint32 e = 5[default = 0, packed = true];
     optional float f = 6[default = 2.3];
+    required NestedTest g = 7;
+    required EmbeddedEnum h = 8;
 
     // embedded single line comment
     message NestedTest {
@@ -37,6 +39,7 @@ message Test {
 
 message SimpleMessage {
     required uint32 field = 1;
+    optional TestEnum enum_field = 2;
     /*
       The following field shouldn't show up
       optional uint32 nonexistent_field = 2;

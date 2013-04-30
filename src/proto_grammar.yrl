@@ -22,7 +22,7 @@ messages -> p_message messages : add_second('$1', '$2').
 
 p_message -> message message_name '{' fields '}' : {message, '$2', '$4'}.
 
-message_name -> var : lowercase_atom('$1').
+message_name -> var : value_of('$1').
 
 fields -> p_enum : {['$1'], []}.
 fields -> p_enum fields : add_first('$1', '$2').
@@ -40,6 +40,7 @@ field ->
 field_rule -> atom : value_of('$1').
 
 field_type -> atom : value_of('$1').
+field_type -> var : value_of('$1').
 
 field_name -> atom : value_of('$1').
 
@@ -77,6 +78,3 @@ add_second(B, {As, Bs}) ->
 
 value_of(Token) ->
     element(3, Token).
-
-lowercase_atom(Var) ->
-    element(3, Var).

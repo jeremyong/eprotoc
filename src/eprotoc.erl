@@ -25,6 +25,7 @@
 decode_message(Message) ->
     lists:reverse(decode_message(Message, [])).
 
+%% hidden
 decode_message(<<>>, Acc) -> Acc;
 decode_message(Message, Acc) ->
     {Varint, Rest} = pop_varint(Message),
@@ -79,6 +80,9 @@ encode_message([{_, {FNum, Type, Value}}|Rest], Acc) ->
     encode_message(Rest, [Res|Acc]).
 
 %% @doc Packs data along with the field num and wire type.
+-spec encode_value(integer(), atom(),
+                   binary() | integer() | float()) ->
+    iolist().
 encode_value(FieldNum, Type, Data) ->
     WireType = wire_type(Type),
     Fun = wire_encode_fun(Type),
@@ -118,7 +122,7 @@ encode_varint(Int, Acc) ->
     Acc1 = [(1 bsl 7) + LastSevenBits|Acc],
     encode_varint(NextInt, Acc1).
 
--spec wire_type(atom()) -> wire_type().
+-spec wire_type(atom()) -> custom | wire_type().
 wire_type(int32) -> 0;
 wire_type(int64) -> 0;
 wire_type(uint32) -> 0;
@@ -136,7 +140,8 @@ wire_type(embedded) -> 2;
 wire_type(repeated) -> 2;
 wire_type(fixed32) -> 5;
 wire_type(sfixed32) -> 5;
-wire_type(float) -> 5.
+wire_type(float) -> 5;
+wire_type(_) -> custom.
 
 -spec wire_encode_fun(atom()) -> function().
 wire_encode_fun(uint32) -> fun encode_varint/1;

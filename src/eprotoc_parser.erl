@@ -3,6 +3,7 @@
 -export([
          generate_parser/0,
          generate_code/1,
+         read_and_scan/1,
          parse_file/1,
          reserved_words/1,
          atom_to_name/1
@@ -12,6 +13,10 @@ generate_parser() ->
     yecc:file("src/proto_grammar.yrl").
 
 parse_file(File) ->
+    Tokens = read_and_scan(File),
+    proto_grammar:parse(Tokens).
+
+read_and_scan(File) ->
     {ok, Contents} = file:read_file(File),
     StripComments = re:replace(Contents, "/\\*([^*]|\\*+[^*/])*\\*+/", "",
                                [global, {return, list}]),
@@ -20,32 +25,65 @@ parse_file(File) ->
     {ok, Tokens, _} = erl_scan:string(StripComments1, 1,
                         {reserved_word_fun, fun reserved_words/1}
                        ),
-    proto_grammar:parse(Tokens).
+    Tokens.
 
 generate_code(File) ->
     {ok, Proto} = parse_file(File),
     PackageName = atom_to_name(element(1, Proto)),
     Package = element(2, Proto),
-    peel(Package, PackageName, []).
+    {_, Result} = peel(Package, {PackageName, [], []}, []),
+    Result.
 
 %% @doc MFs refers to messages and fields
-peel({[], []}, _, Acc) -> Acc;
-peel({[{enum, Enum, Fields}|Enums], MFs}, Level, Acc) ->
+%% The second argument is a nesting accumulator of the form:
+%% {nesting level, enums available at this scope, messages available at this scope}
+%% The nesting level doubles as the module name of the current scope
+%% This code essentially functions like an onion (albeit a complicated one),
+%% hence the name.
+peel({[], []}, NestingAcc, Acc) -> {NestingAcc, Acc};
+peel([], NestingAcc, Acc) -> {NestingAcc, Acc};
+%% Peel all enums first
+peel({[{enum, Enum, Fields}|Enums], MFs},
+     {Level, AccEnums, AccMessages}, Acc) ->
     EnumName = atom_to_name(Enum),
     Text = generate_enum(EnumName, Fields, ""),
     Acc1 = [{Level, Text}|Acc],
-    peel({Enums, MFs}, Level, Acc1);
-peel({[], [{message, Message, {Enums, Fields}}|MFs]}, Level, Acc) ->
+    %% Make this enum available to everything at this nesting level or deeper.
+    AccEnums1 = [{Level, Enum}|AccEnums],
+    peel({Enums, MFs}, {Level, AccEnums1, AccMessages}, Acc1);
+%% Because we parse a message immediately, we need to look ahead to find messages
+%% at the same nesting level. We do this right after parsing the enums.
+peel({[], MFs}, {Level, AccEnums, AccMessages}, Acc) ->
+    Messages = lists:filter(fun(MF) ->
+                                    element(1, MF) == message
+                            end, MFs),
+    Messages1 = lists:map(fun(Msg) ->
+                                  MessageAtom = element(2, Msg),
+                                  MessageName = atom_to_name(MessageAtom),
+                                  {Level ++ "__" ++ MessageName, MessageAtom}
+                          end, Messages),
+    AccMessages1 = Messages1 ++ AccMessages,
+    peel(MFs, {Level, AccEnums, AccMessages1}, Acc);
+peel([{message, Message, {Enums, Fields}}|MFs],
+     {Level, AccEnums, AccMessages}, Acc) ->
     MessageName = atom_to_name(Message),
     Level1 = Level ++ "__" ++ MessageName,
-    Text = generate_message(Fields),
-    Acc2 = peel({Enums, Fields}, Level1, [{Level, Text}|Acc]),
-    peel({[], MFs}, Level, Acc2);
-peel({[], [{field, _Rule, _Type, AtomName, Num, Opts}|MFs]}, Level, Acc) ->
+    %% Generate message encoding and decoding functions with everything available
+    %% at this level of nesting thus far.
+    {{_, AccEnums1, AccMessages1}, Acc1} =
+        peel({Enums, Fields}, {Level1, AccEnums, AccMessages}, Acc),
+    Text = generate_message(Fields, AccEnums1, AccMessages1),
+    %% Make this message available to everything at this nesting level or deeper.
+    %% Note that the messages added to the scope when parsing the message contents
+    %% are thrown away!
+    AccMessages2 = [{Level1, Message}|AccMessages],
+    peel(MFs, {Level, AccEnums, AccMessages2}, [{Level1, Text}|Acc1]);
+peel([{field, _Rule, _Type, AtomName, Num, Opts}|MFs],
+     {Level, AccEnums, AccMessages}, Acc) ->
     Name = atom_to_list(AtomName),
     Text = generate_field(Name, Num, Opts),
     Acc1 = [{Level, Text}|Acc],
-    peel({[], MFs}, Level, Acc1).
+    peel(MFs, {Level, AccEnums, AccMessages}, Acc1).
 
 %% @doc Supply getter and setter functions for the specified field
 generate_field(Name, Num, Opts) ->
@@ -61,32 +99,73 @@ generate_field(Name, Num, Opts) ->
                         D when is_float(D) ->
                             float_to_list(D)
                     end,
-    "g_" ++ Name ++ "(Data) ->\n"
-        "    case lists:keysearch(" ++ N ++ ", 1, Data) of\n"
-        "        {value, {_, _, Value}} -> Value;\n"
-        "        false -> " ++ DefaultString ++ "\n"
-        "    end.\n"
-        "s_" ++ Name ++ "(Data, Value) ->\n"
-        "    lists:keystore(" ++ N ++ ", 1, Data, {" ++ N ++ ", get_type(Data), Value}).\n\n".
+    %% If no default is assigned, return undefined if unset.
+    %% If a default is assigned and the key is not found, set the key to the
+    %% default value and return the default value.
+    Getter = case Default of
+                 undefined ->
+                     "g_" ++ Name ++ "(Data) ->\n"
+                         "    case lists:keysearch(" ++ N ++ ", 1, Data) of\n"
+                         "        {value, {_, _, Value}} -> Value;\n"
+                         "        false -> undefined\n"
+                         "    end.\n";
+                 _ ->
+                     "g_" ++ Name ++ "(Data) ->\n"
+                         "    case lists:keysearch(" ++ N ++ ", 1, Data) of\n"
+                         "        {value, {_, _, Value}} -> Value;\n"
+                         "        false ->\n"
+                         "            s_" ++ Name ++ "(Data, " ++ DefaultString ++ "),\n"
+                         "            " ++ DefaultString ++ "\n"
+                         "    end.\n"
+             end,
+    Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
+        "    lists:keystore(" ++ N ++ ", 1, Data, {" ++ N ++ ", get_type(Data), Value}).\n\n",
+    Getter ++ Setter.
 
+%% @doc Generates forward and reverse lookups for simplicity.
 generate_enum(Name, [{FieldAtom, Value}], Acc) ->
     Field = atom_to_name(FieldAtom),
-    Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ".\n\n";
+    Acc1 = Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ";\n",
+    Acc1 ++ Name ++ "(" ++ Value ++ ") -> " ++ Field ++ ".\n\n";
 generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
     Field = atom_to_name(FieldAtom),
     Acc1 = Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ";\n",
-    generate_enum(Name, Fields, Acc1).
+    Acc2 = Acc1 ++ Name ++ "(" ++ Value ++ ") -> " ++ Field ++ ";\n",
+    generate_enum(Name, Fields, Acc2).
 
-generate_message(Fields) ->
+generate_message(Fields, Enums, Messages) ->
     FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
-    generate_message_rules(FieldsOnly, "") ++
-        generate_message_types(FieldsOnly, "") ++
+    generate_message_lookups(FieldsOnly, "") ++
+        generate_message_rules(FieldsOnly, "") ++
+        generate_message_types(FieldsOnly, "", Enums, Messages) ++
         "-spec decode(Payload :: binary()) -> list().\n"
         "decode(Payload) ->\n"
-        "    eprotoc:decode(Data).\n\n"
+        "    Raw = eprotoc:decode(Data),\n"
+        "    map_values(Raw).\n\n"
+        "-spec map_values(iolist()) -> list().\n"
+        "map_values(Raw) ->\n"
+        "    map_values(Raw, []).\n\n"
+        "map_values([{Num, Type, Value}|Rest], Acc) ->\n"
+        "    Field = lookup_field(Num),\n"
+        "    case is_function(Field) of\n"
+        "        true ->\n"
+        "            Result = Field(Value),\n"
+        "            map_values(Rest, [Result|Acc];\n"
+        "        false ->\n"
+        "            \n"
         "-spec encode(Data :: list()) -> iolist().\n"
         "encode(Data) ->\n"
         "    eprotoc:encode(Data).\n\n".
+
+%% No fields in message, nothing to do.
+generate_message_lookups([], _) -> "";
+generate_message_lookups([{field, _, _, FieldAtom, Num, _}], Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc ++ "lookup_field(" ++ integer_to_list(Num) ++ ") -> " ++ Name ++ ".\n\n";
+generate_message_lookups([{field, _, _, FieldAtom, Num, _}|Rest], Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc1 = Acc ++ "lookup_field(" ++ integer_to_list(Num) ++ ") -> " ++ Name ++ ";\n",
+    generate_message_lookups(Rest, Acc1).
 
 %% No fields in message, nothing to do.
 generate_message_rules([], _) -> "";
@@ -99,15 +178,39 @@ generate_message_rules([{field, Rule, _, FieldAtom, _, _}|Rest], Acc) ->
     generate_message_rules(Rest, Acc1).
 
 %% No fields in message, nothing to do.
-generate_message_types([], _) -> "";
-generate_message_types([{field, _, Type, FieldAtom, _, _}], Acc) ->
+generate_message_types([], _, _, _) -> "";
+generate_message_types([{field, _, Type, FieldAtom, _, _}],
+                       Acc, Enums, Messages) ->
     Name = atom_to_name(FieldAtom),
-    Acc ++ "get_type(" ++ Name ++ ") -> " ++ atom_to_list(Type) ++ ".\n\n";
-generate_message_types([{field, _, Type, FieldAtom, _, _}|Rest], Acc) ->
+    Acc ++ "get_type(" ++ Name ++ ") -> " ++
+        get_field_type(Type, Enums, Messages) ++ ".\n\n";
+generate_message_types([{field, _, Type, FieldAtom, _, _}|Rest],
+                       Acc, Enums, Messages) ->
     Name = atom_to_name(FieldAtom),
-    Acc1 = Acc ++ "get_type(" ++ Name ++ ") -> " ++ atom_to_list(Type) ++ ";\n",
-    generate_message_types(Rest, Acc1).
+    Acc1 = Acc ++ "get_type(" ++ Name ++ ") -> " ++
+        get_field_type(Type, Enums, Messages) ++ ";\n",
+    generate_message_types(Rest, Acc1, Enums, Messages).
 
+get_field_type(TypeAtom, Enums, Messages) ->
+    Type = atom_to_name(TypeAtom),
+    case eprotoc:wire_type(TypeAtom) of
+        custom ->
+            case {lists:keysearch(TypeAtom, 2, Enums),
+                  lists:keysearch(TypeAtom, 2, Messages)} of
+                {{value, {Level, _}}, false} ->
+                    %% Enums are treated like uint32 types on the wire
+                    "{enum, " ++ Level ++ "}";
+                {false, {value, {Level, _}}} ->
+                    %% Custom types are other messages that provide their own mapping funs.
+                    "fun " ++ Level ++ ":decode/1";
+                {false, false} ->
+                    throw("Message or enum type " ++ Type ++ " not in scope.");
+                {_, _} ->
+                    throw("Ambiguous message or enum type " ++ Type ++ ".")
+            end;
+        _ ->
+            Type
+    end.
 
 reserved_words(package) -> true;
 reserved_words(message) -> true;
