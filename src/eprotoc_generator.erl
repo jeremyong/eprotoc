@@ -284,6 +284,8 @@ reserved_words(message) -> true;
 reserved_words(enum) -> true;
 reserved_words(packed) -> true;
 reserved_words(default) -> true;
+reserved_words(true) -> true;
+reserved_words(false) -> true;
 reserved_words(_) -> false.
 
 atom_to_name(Atom) ->

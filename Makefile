@@ -6,6 +6,6 @@ all:
 clean:
 	rm -rf ebin .eunit
 
-test:
+test: all
 	./eprotoc test/test.proto test
 	rebar eunit

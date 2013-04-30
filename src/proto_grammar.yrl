@@ -9,7 +9,8 @@ options option.
 
 Terminals
 ';' '=' '{' '}' '[' ']' ','
-package default packed message enum atom string integer float var bool.
+package default packed message
+enum atom string integer float var bool true false.
 
 Rootsymbol proto.
 
@@ -55,14 +56,15 @@ option -> default '=' float : {default, value_of('$3')}.
 option -> default '=' string : {default, value_of('$3')}.
 option -> default '=' var : {default, value_of('$3')}.
 option -> default '=' bool : {default, value_of('$3')}.
+option -> default '=' true : {default, true}.
+option -> default '=' false : {default, false}.
 
 p_enum -> enum enum_name '{' enum_fields '}' : {enum, '$2', '$4'}.
 
 enum_fields -> enum_field : ['$1'].
 enum_fields -> enum_field enum_fields : ['$1'|'$2'].
 
-enum_field ->
-    enum_name '=' enum_value ';' : {'$1', '$3'}.
+enum_field -> enum_name '=' enum_value ';' : {'$1', '$3'}.
 
 enum_name -> atom : value_of('$1').
 enum_name -> var : value_of('$1').

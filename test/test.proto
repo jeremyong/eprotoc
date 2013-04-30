@@ -25,3 +25,7 @@ message Test5 {
         required uint32 f = 1;
     }
 }
+
+message Test7 {
+    optional bool g = 1 [default = true];
+}

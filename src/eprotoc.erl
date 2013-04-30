@@ -123,6 +123,10 @@ encode_varint(Int) when Int >= 0 ->
     lists:reverse(encode_varint(Int, [])).
 
 %% hidden
+encode_varint(true, Acc) ->
+    [1|Acc];
+encode_varint(false, Acc) ->
+    [0|Acc];
 encode_varint(Int, Acc) when Int =< 127->
     %% Fewer than seven bits left. End of the line.
     [Int|Acc];
@@ -169,7 +173,8 @@ wire_encode_fun(uint32) -> fun encode_varint/1;
 wire_encode_fun(uint64) -> fun encode_varint/1;
 wire_encode_fun(sint32) -> fun encode_sint32/1;
 wire_encode_fun(sint64) -> fun encode_sint64/1;
-wire_encode_fun(string) -> fun encode_string/1.
+wire_encode_fun(string) -> fun encode_string/1;
+wire_encode_fun(bool) -> fun encode_varint/1.
 
 -spec wire_decode_fun(wire_type()) -> function().
 wire_decode_fun(0) -> fun pop_varint/1;
