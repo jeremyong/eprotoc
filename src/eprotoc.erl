@@ -50,13 +50,13 @@ pop_varint(<< 0:1, Data:7, Rest/binary >>, Acc, Iter) ->
 
 pop_string(Payload) ->
     {Len, Rest} = pop_varint(Payload),
-    << String:Len/unit:8, Rest1/binary >> = Rest,
+    << String:Len/binary-unit:8, Rest1/binary >> = Rest,
     {String, Rest1}.
 
-pop_32bits(<< Value:32, Rest/binary >>) ->
+pop_32bits(<< Value:32/binary, Rest/binary >>) ->
     {Value, Rest}.
 
-pop_64bits(<< Value:64, Rest/binary >>) ->
+pop_64bits(<< Value:64/binary, Rest/binary >>) ->
     {Value, Rest}.
 
 %% @doc Raw decoded messages are keylists where the keys are
@@ -82,13 +82,19 @@ encode_message([{_, {FNum, Type, Value}}|Rest], Acc) ->
     encode_message(Rest, [Res|Acc]).
 
 %% @doc Packs data along with the field num and wire type.
--spec encode_value(integer(), atom(),
+-spec encode_value(integer(), atom() | function(),
                    binary() | integer() | float()) ->
     iolist().
+encode_value(FieldNum, EncodeFun, Data) when is_function(EncodeFun) ->
+    %% For message types, an encoding function is provided and the
+    %% wire type is 2 for a fixed size packet
+    Message = EncodeFun(Data),
+    Size = iolist_size(Message),
+    [encode_varint((FieldNum bsl 3) bor 2)|[encode_varint(Size)|Message]];
 encode_value(FieldNum, Type, Data) ->
     WireType = wire_type(Type),
     Fun = wire_encode_fun(Type),
-    [encode_varint((FieldNum bsl 3) bor WireType)|Fun(Data)].
+    [encode_varint((FieldNum bsl 3) bor WireType), Fun(Data)].
 
 %% @doc Strings are preceded by a varint encoded length.
 -spec encode_string(binary()) -> iolist().
@@ -159,9 +165,19 @@ wire_decode_fun(2) -> fun pop_string/1;
 wire_decode_fun(5) -> fun pop_32bits/1.
 
 cast_type(int32, Value) ->
-    Value;
+    case Value band 16#8000000000000000 =/= 0 of
+        true ->
+            Value - 16#8000000000000000;
+        _ ->
+            Value
+    end;
 cast_type(int64, Value) ->
-    Value;
+    case Value band 16#8000000000000000 =/= 0 of
+        true ->
+            Value - 16#8000000000000000;
+        _ ->
+            Value
+    end;
 cast_type(uint32, Value) ->
     Value;
 cast_type(uint64, Value) ->

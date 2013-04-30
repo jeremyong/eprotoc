@@ -140,7 +140,7 @@ generate_field(Name, Num, Opts) ->
                          "            " ++ DefaultString ++ "\n"
                          "    end.\n"
              end,
-    Setter = "s_" ++ Name ++ "(Data, Key, Value) ->\n"
+    Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
         "    lists:keystore(" ++ N ++ ", 1, Data, {" ++ N ++
         ", get_type(" ++ Name ++ "), Value}).\n\n",
     Getter ++ Setter.
@@ -149,7 +149,7 @@ generate_field(Name, Num, Opts) ->
 generate_enum(Name, [{FieldAtom, Value}], Acc) ->
     Field = atom_to_name(FieldAtom),
     Acc1 = Acc ++ Name ++ "_enum(" ++ Field ++ ") -> " ++ Value ++ ";\n",
-    Acc2 = Acc1 ++ Name ++ "_enum(" ++ Value ++ ") -> " ++ Field ++ ";\n\n",
+    Acc2 = Acc1 ++ Name ++ "_enum(" ++ Value ++ ") -> " ++ Field ++ ";\n",
     Acc2 ++ Name ++ "_enum(_) -> undefined.\n\n";
 generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
     Field = atom_to_name(FieldAtom),
@@ -174,8 +174,8 @@ generate_message(Fields, Enums, Messages) ->
         "    Field = lookup_field(Num),\n"
         "    Type = get_type(Field),\n"
         "    {Result, Type1} = case Type of\n"
-        "                          {message, Fun} ->\n"
-        "                              {Fun(Value), string};\n"
+        "                          {message, Decode, Encode} ->\n"
+        "                              {Decode(Value), Encode};\n"
         "                          {enum, Fun} ->\n"
         "                              {Fun(Value), uint32};\n"
         "                          _ ->\n"
@@ -232,7 +232,7 @@ get_field_type(TypeAtom, Enums, Messages) ->
                     "{enum, fun " ++ Level ++ ":" ++ Enum ++ "_enum/1}";
                 {false, {value, {Level, _}}} ->
                     %% Custom types are other messages that provide their own mapping funs.
-                    "{message, fun " ++ Level ++ ":decode/1}";
+                    "{message, fun " ++ Level ++ ":decode/1, fun " ++ Level ++ ":encode/1}";
                 {false, false} ->
                     throw("Message or enum type " ++ Type ++ " not in scope.");
                 {_, _} ->
