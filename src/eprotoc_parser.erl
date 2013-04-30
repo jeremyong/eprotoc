@@ -2,8 +2,10 @@
 
 -export([
          generate_parser/0,
-         generate_code/1,
+         process_file/2,
          read_and_scan/1,
+         generate_code/1,
+         output_results/2,
          parse_file/1,
          reserved_words/1,
          atom_to_name/1
@@ -11,6 +13,10 @@
 
 generate_parser() ->
     yecc:file("src/proto_grammar.yrl").
+
+process_file(File, Outdir) ->
+    Result = generate_code(File),
+    output_results(Outdir, Result).
 
 parse_file(File) ->
     Tokens = read_and_scan(File),
@@ -33,6 +39,22 @@ generate_code(File) ->
     Package = element(2, Proto),
     {_, Result} = peel(Package, {PackageName, [], []}, []),
     Result.
+
+output_results(Dir, []) ->
+    io:format("Output finished to directory ~p~n", [Dir]),
+    ok;
+output_results(Dir, [{Module,Text}|Rest]) ->
+    Filepath = Dir ++ "/" ++ Module ++ ".erl",
+    case filelib:is_file(Filepath) of
+        false ->
+            file:write_file(Filepath,
+                            "-module(" ++ Module ++ ").\n"
+                            "-compile(export_all).\n\n");
+        true ->
+            ok
+    end,
+    file:write_file(Filepath, Text, [append]),
+    output_results(Dir, Rest).
 
 %% @doc MFs refers to messages and fields
 %% The second argument is a nesting accumulator of the form:
@@ -118,19 +140,21 @@ generate_field(Name, Num, Opts) ->
                          "            " ++ DefaultString ++ "\n"
                          "    end.\n"
              end,
-    Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
-        "    lists:keystore(" ++ N ++ ", 1, Data, {" ++ N ++ ", get_type(Data), Value}).\n\n",
+    Setter = "s_" ++ Name ++ "(Data, Key, Value) ->\n"
+        "    lists:keystore(" ++ N ++ ", 1, Data, {" ++ N ++
+        ", get_type(" ++ Name ++ "), Value}).\n\n",
     Getter ++ Setter.
 
 %% @doc Generates forward and reverse lookups for simplicity.
 generate_enum(Name, [{FieldAtom, Value}], Acc) ->
     Field = atom_to_name(FieldAtom),
-    Acc1 = Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ";\n",
-    Acc1 ++ Name ++ "(" ++ Value ++ ") -> " ++ Field ++ ".\n\n";
+    Acc1 = Acc ++ Name ++ "_enum(" ++ Field ++ ") -> " ++ Value ++ ";\n",
+    Acc2 = Acc1 ++ Name ++ "_enum(" ++ Value ++ ") -> " ++ Field ++ ";\n\n",
+    Acc2 ++ Name ++ "_enum(_) -> undefined.\n\n";
 generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
     Field = atom_to_name(FieldAtom),
-    Acc1 = Acc ++ Name ++ "(" ++ Field ++ ") -> " ++ Value ++ ";\n",
-    Acc2 = Acc1 ++ Name ++ "(" ++ Value ++ ") -> " ++ Field ++ ";\n",
+    Acc1 = Acc ++ Name ++ "_enum(" ++ Field ++ ") -> " ++ Value ++ ";\n",
+    Acc2 = Acc1 ++ Name ++ "_enum(" ++ Value ++ ") -> " ++ Field ++ ";\n",
     generate_enum(Name, Fields, Acc2).
 
 generate_message(Fields, Enums, Messages) ->
@@ -140,22 +164,27 @@ generate_message(Fields, Enums, Messages) ->
         generate_message_types(FieldsOnly, "", Enums, Messages) ++
         "-spec decode(Payload :: binary()) -> list().\n"
         "decode(Payload) ->\n"
-        "    Raw = eprotoc:decode(Data),\n"
+        "    Raw = eprotoc:decode_message(Payload),\n"
         "    map_values(Raw).\n\n"
         "-spec map_values(iolist()) -> list().\n"
         "map_values(Raw) ->\n"
         "    map_values(Raw, []).\n\n"
-        "map_values([{Num, Type, Value}|Rest], Acc) ->\n"
+        "map_values([], Acc) -> Acc;\n"
+        "map_values([{Num, _WireType, Value}|Rest], Acc) ->\n"
         "    Field = lookup_field(Num),\n"
-        "    case is_function(Field) of\n"
-        "        true ->\n"
-        "            Result = Field(Value),\n"
-        "            map_values(Rest, [Result|Acc];\n"
-        "        false ->\n"
-        "            \n"
+        "    Type = get_type(Field),\n"
+        "    {Result, Type1} = case Type of\n"
+        "                          {message, Fun} ->\n"
+        "                              {Fun(Value), string};\n"
+        "                          {enum, Fun} ->\n"
+        "                              {Fun(Value), uint32};\n"
+        "                          _ ->\n"
+        "                              {eprotoc:cast_type(Type, Value), Type}\n"
+        "                      end,\n"
+        "    map_values(Rest, [{Field, {Num, Type1, Result}}|Acc]).\n\n"
         "-spec encode(Data :: list()) -> iolist().\n"
         "encode(Data) ->\n"
-        "    eprotoc:encode(Data).\n\n".
+        "    eprotoc:encode_message(Data).\n\n".
 
 %% No fields in message, nothing to do.
 generate_message_lookups([], _) -> "";
@@ -197,12 +226,13 @@ get_field_type(TypeAtom, Enums, Messages) ->
         custom ->
             case {lists:keysearch(TypeAtom, 2, Enums),
                   lists:keysearch(TypeAtom, 2, Messages)} of
-                {{value, {Level, _}}, false} ->
+                {{value, {Level, EnumAtom}}, false} ->
                     %% Enums are treated like uint32 types on the wire
-                    "{enum, " ++ Level ++ "}";
+                    Enum = atom_to_name(EnumAtom),
+                    "{enum, fun " ++ Level ++ ":" ++ Enum ++ "_enum/1}";
                 {false, {value, {Level, _}}} ->
                     %% Custom types are other messages that provide their own mapping funs.
-                    "fun " ++ Level ++ ":decode/1";
+                    "{message, fun " ++ Level ++ ":decode/1}";
                 {false, false} ->
                     throw("Message or enum type " ++ Type ++ " not in scope.");
                 {_, _} ->
@@ -212,6 +242,7 @@ get_field_type(TypeAtom, Enums, Messages) ->
             Type
     end.
 
+%% @doc Used by erl_scan
 reserved_words(package) -> true;
 reserved_words(message) -> true;
 reserved_words(enum) -> true;

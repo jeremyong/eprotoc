@@ -14,10 +14,12 @@
          encode_varint/1,
          wire_type/1,
          wire_encode_fun/1,
-         wire_decode_fun/1
+         wire_decode_fun/1,
+         cast_type/2
         ]).
 
 -type wire_type() :: 0 | 1 | 2 | 5.
+
 
 %% @doc Decodes a supplied binary message into a list of values.
 %% Each value is of the form {field num, wire type, Value}.
@@ -57,7 +59,7 @@ pop_32bits(<< Value:32, Rest/binary >>) ->
 pop_64bits(<< Value:64, Rest/binary >>) ->
     {Value, Rest}.
 
-%% @doc Raw decoded messages are orddicts where the keys are
+%% @doc Raw decoded messages are keylists where the keys are
 %% the field names, and the values are tuples of {field number,
 %% type, and value}. In the event that the value is a repeated
 %% field, the value is instead a list of raw decoded messages.
@@ -155,3 +157,34 @@ wire_decode_fun(0) -> fun pop_varint/1;
 wire_decode_fun(1) -> fun pop_64bits/1;
 wire_decode_fun(2) -> fun pop_string/1;
 wire_decode_fun(5) -> fun pop_32bits/1.
+
+cast_type(int32, Value) ->
+    Value;
+cast_type(int64, Value) ->
+    Value;
+cast_type(uint32, Value) ->
+    Value;
+cast_type(uint64, Value) ->
+    Value;
+cast_type(sint32, Value) ->
+    (Value bsr 1) bxor (-(Value band 1));
+cast_type(sint64, Value) ->
+    (Value bsr 1) bxor (-(Value band 1));
+cast_type(string, Value) ->
+    Value;
+cast_type(bool, 1) ->
+    true;
+cast_type(bool, 0) ->
+    false;
+cast_type(fixed64, << Value:64/little-unsigned-integer >>) ->
+    Value;
+cast_type(sfixed64, << Value:64/little-unsigned-integer >>) ->
+    (Value bsr 1) bxor (-(Value band 1));
+cast_type(double, << Value/little-float >>) ->
+    Value;
+cast_type(fixed32, << Value:32/little-unsigned-integer >>) ->
+    binary:decode_unsigned(Value);
+cast_type(sfixed32, << Value:32/little-unsigned-integer >>) ->
+    (Value bsr 1) bxor (-(Value band 1));
+cast_type(float, << Value/little-float >>) ->
+    Value.
