@@ -56,7 +56,10 @@ delete_existing_files(Dir, [{Module, _}|Rest]) ->
             ok;
         true ->
             file:delete(Filepath)
-    end.
+    end,
+    delete_existing_files(Dir, Rest);
+delete_existing_files(_, []) ->
+    ok.
 
 output_results(Dir, []) ->
     io:format("Output finished to directory ~p~n", [Dir]),
