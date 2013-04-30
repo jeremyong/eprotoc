@@ -57,13 +57,13 @@ test_encode_string() ->
 
 test_encode_value_string() ->
     Result = eprotoc:encode_value(2, string, <<"testing">>),
-    ?assertEqual([[16#12], [7], <<"testing">>], Result).
+    ?assertEqual([[16#12], [[7], <<"testing">>]], Result).
 
 test_encode_value_varint() ->
     Result = eprotoc:encode_value(2, uint32, 300),
-    ?assertEqual([[16], 172, 2], Result).
+    ?assertEqual([[16], [172, 2]], Result).
 
 test_encode_message() ->
     Message = [{a, {1, uint32, 150}}],
-    Result = eprotoc:encode_message(orddict:from_list(Message)),
-    ?assertEqual([[[16#08], 16#96, 16#01]], Result).
+    Result = eprotoc:encode_message(Message),
+    ?assertEqual([[[16#08], [16#96, 16#01]]], Result).

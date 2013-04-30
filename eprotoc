@@ -1,0 +1,10 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+
+-define(Generator, eprotoc_generator).
+
+main([File, Dir]) ->
+    CurrentDir = filename:dirname(escript:script_name()),
+    code:add_path(CurrentDir ++ "/ebin"),
+    {module, _} = code:ensure_loaded(?Generator),
+    ?Generator:process_file(File, Dir).

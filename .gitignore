@@ -5,3 +5,4 @@ deps
 *.plt
 ebin
 src/proto_grammar.erl
+test/test__*

@@ -5,7 +5,10 @@ message Test1 {
 }
 
 message Test2 {
-    required string b = 2;
+    enum Foo {
+        Bar = 150;
+    }
+    required Foo b = 2;
 }
 
 message Test3 {

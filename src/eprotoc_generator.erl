@@ -1,4 +1,4 @@
--module(eprotoc_parser).
+-module(eprotoc_generator).
 
 -export([
          generate_parser/0,
@@ -14,14 +14,30 @@
 generate_parser() ->
     yecc:file("src/proto_grammar.yrl").
 
+%% @doc Processes a proto file in three steps. First, it parses the proto file
+%% and generates the code. Next, it deletes existing modules that have been generated
+%% before. Last, it outputs the results of the generated code to the supplied directory.
+-spec process_file(list(), list()) -> ok.
 process_file(File, Outdir) ->
     Result = generate_code(File),
+    delete_existing_files(Outdir, Result),
     output_results(Outdir, Result).
 
+-spec generate_code(list()) -> list().
+generate_code(File) ->
+    {ok, Proto} = parse_file(File),
+    PackageName = atom_to_name(element(1, Proto)),
+    Package = element(2, Proto),
+    {_, Result} = peel(Package, {PackageName, [], []}, []),
+    Result.
+
+-spec parse_file(list()) -> list().
 parse_file(File) ->
     Tokens = read_and_scan(File),
     proto_grammar:parse(Tokens).
 
+%% @doc Reads a file into memory and scans it, deleting comments along the way.
+-spec read_and_scan(list()) -> list().
 read_and_scan(File) ->
     {ok, Contents} = file:read_file(File),
     StripComments = re:replace(Contents, "/\\*([^*]|\\*+[^*/])*\\*+/", "",
@@ -33,18 +49,20 @@ read_and_scan(File) ->
                        ),
     Tokens.
 
-generate_code(File) ->
-    {ok, Proto} = parse_file(File),
-    PackageName = atom_to_name(element(1, Proto)),
-    Package = element(2, Proto),
-    {_, Result} = peel(Package, {PackageName, [], []}, []),
-    Result.
+delete_existing_files(Dir, [{Module, _}|Rest]) ->
+    Filepath = get_filepath(Dir, Module),
+    case filelib:is_file(Filepath) of
+        false ->
+            ok;
+        true ->
+            file:delete(Filepath)
+    end.
 
 output_results(Dir, []) ->
     io:format("Output finished to directory ~p~n", [Dir]),
     ok;
 output_results(Dir, [{Module,Text}|Rest]) ->
-    Filepath = Dir ++ "/" ++ Module ++ ".erl",
+    Filepath = get_filepath(Dir, Module),
     case filelib:is_file(Filepath) of
         false ->
             file:write_file(Filepath,
@@ -56,7 +74,11 @@ output_results(Dir, [{Module,Text}|Rest]) ->
     file:write_file(Filepath, Text, [append]),
     output_results(Dir, Rest).
 
-%% @doc MFs refers to messages and fields
+%% hidden
+get_filepath(Dir, File) ->
+    Dir ++ "/" ++ File ++ ".erl".
+
+%% @doc Hidden. MFs refers to messages or fields (they may be at the same nesting level.
 %% The second argument is a nesting accumulator of the form:
 %% {nesting level, enums available at this scope, messages available at this scope}
 %% The nesting level doubles as the module name of the current scope
