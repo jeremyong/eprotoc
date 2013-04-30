@@ -1,0 +1,13 @@
+package Test;
+
+message Test1 {
+    required uint32 a = 1;
+}
+
+message Test2 {
+    required string b = 2;
+}
+
+message Test3 {
+    required Test1 c = 3;
+}
