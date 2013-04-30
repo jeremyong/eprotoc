@@ -10,6 +10,7 @@ cleanup(_) ->
 eprotoc_generator_test_() ->
     {setup, fun setup/0, fun cleanup/1,
      [
+      fun test_code_generation/0,
       fun test_encode_message/0,
       fun test_decode_message/0,
       fun test_encode_nested_message/0,
@@ -23,6 +24,11 @@ eprotoc_generator_test_() ->
       fun test_encode_bool_message/0,
       fun test_decode_bool_message/0
      ]}.
+
+test_code_generation() ->
+    %% Not an actual test per se but gives an idea of code coverage
+    %% on the generator code and ensures that the generation doesn't error
+    eprotoc_generator:process_file("../test/test.proto", "/dev/null").
 
 test_encode_message() ->
     %% Message Test1 with value a = 150
