@@ -17,7 +17,9 @@ eprotoc_generator_test_() ->
       fun test_encode_enum_message/0,
       fun test_decode_enum_message/0,
       fun test_encode_repeated_message/0,
-      fun test_decode_repeated_message/0
+      fun test_decode_repeated_message/0,
+      fun test_encode_nested_repeated_message/0,
+      fun test_decode_nested_repeated_message/0
      ]}.
 
 test_encode_message() ->
@@ -65,4 +67,25 @@ test_decode_repeated_message() ->
     Payload = <<8,150,1,8,150,1>>,
     Result = test__test4:decode(Payload),
     Message = [{d, [{1, uint32, 150}, {1, uint32, 150}]}],
+    ?assertEqual(Message, Result).
+
+test_encode_nested_repeated_message() ->
+    Message = [{e,[{1,
+                    {message,fun test__test5__test6:encode/1},
+                    [{f,{1,uint32,300}}]},
+                   {1,
+                    {message,fun test__test5__test6:encode/1},
+                    [{f,{1,uint32,150}}]}]}],
+    Result = list_to_binary(test__test5:encode(Message)),
+    ?assertEqual(<<10,3,8,172,2,10,3,8,150,1>>, Result).
+
+test_decode_nested_repeated_message() ->
+    Payload = <<10,3,8,172,2,10,3,8,150,1>>,
+    Result = test__test5:decode(Payload),
+    Message = [{e,[{1,
+                    {message,fun test__test5__test6:encode/1},
+                    [{f,{1,uint32,300}}]},
+                   {1,
+                    {message,fun test__test5__test6:encode/1},
+                    [{f,{1,uint32,150}}]}]}],
     ?assertEqual(Message, Result).

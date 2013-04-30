@@ -12,6 +12,7 @@
          encode_sint32/1,
          encode_sint64/1,
          encode_varint/1,
+         reverse_repeated_fields/1,
          wire_type/1,
          wire_encode_fun/1,
          wire_decode_fun/1,
@@ -19,7 +20,6 @@
         ]).
 
 -type wire_type() :: 0 | 1 | 2 | 5.
-
 
 %% @doc Decodes a supplied binary message into a list of values.
 %% Each value is of the form {field num, wire type, Value}.
@@ -132,6 +132,16 @@ encode_varint(Int, Acc) ->
     %% More bytes to follow. Set the continuation bit
     Acc1 = [(1 bsl 7) + LastSevenBits|Acc],
     encode_varint(NextInt, Acc1).
+
+%% Repeated fields are reversed upon decoding. This remedies that.
+-spec reverse_repeated_fields(list()) -> list().
+reverse_repeated_fields(Fields) ->
+    lists:map(fun({N, Fs}) ->
+                      case is_list(Fs) of
+                          true -> {N, lists:reverse(Fs)};
+                          false -> {N, Fs}
+                      end
+              end, Fields).
 
 -spec wire_type(atom()) -> custom | wire_type().
 wire_type(int32) -> 0;

@@ -18,3 +18,10 @@ message Test3 {
 message Test4 {
     repeated uint32 d = 1;
 }
+
+message Test5 {
+    repeated Test6 e = 1;
+    message Test6 {
+        required uint32 f = 1;
+    }
+}

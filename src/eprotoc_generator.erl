@@ -190,7 +190,7 @@ generate_message(Fields, Enums, Messages) ->
         "-spec decode(Payload :: binary()) -> list().\n"
         "decode(Payload) ->\n"
         "    Raw = eprotoc:decode_message(Payload),\n"
-        "    map_values(Raw).\n\n"
+        "    eprotoc:reverse_repeated_fields(map_values(Raw)).\n\n"
         "-spec map_values(iolist()) -> list().\n"
         "map_values(Raw) ->\n"
         "    map_values(Raw, []).\n\n"
