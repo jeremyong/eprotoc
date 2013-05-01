@@ -166,7 +166,6 @@ generate_field(Rule, Name, Num, Opts) ->
                          "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
                          "        {value, {_, {_, _, " ++ VString ++ "}}} -> " ++ VString ++ ";\n"
                          "        false ->\n"
-                         "            s_" ++ Name ++ "(Data, " ++ F ++ DefaultString ++ B ++ "),\n"
                          "            " ++ F ++ DefaultString ++ B ++ "\n"
                          "    end.\n"
              end,
