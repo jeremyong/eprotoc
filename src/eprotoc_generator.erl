@@ -125,15 +125,15 @@ peel([{message, Message, {Enums, Fields}}|MFs],
     %% are thrown away!
     AccMessages2 = [{Level1, Message}|AccMessages],
     peel(MFs, {Level, AccEnums, AccMessages2}, [{Level1, Text}|Acc1]);
-peel([{field, _Rule, _Type, AtomName, Num, Opts}|MFs],
+peel([{field, Rule, _Type, AtomName, Num, Opts}|MFs],
      {Level, AccEnums, AccMessages}, Acc) ->
     Name = atom_to_list(AtomName),
-    Text = generate_field(Name, Num, Opts),
+    Text = generate_field(Rule, Name, Num, Opts),
     Acc1 = [{Level, Text}|Acc],
     peel(MFs, {Level, AccEnums, AccMessages}, Acc1).
 
 %% @doc Supply getter and setter functions for the specified field
-generate_field(Name, Num, Opts) ->
+generate_field(Rule, Name, Num, Opts) ->
     N = integer_to_list(Num),
     Default = proplists:get_value(default, Opts),
     DefaultString = case Default of
@@ -149,25 +149,34 @@ generate_field(Name, Num, Opts) ->
     %% If no default is assigned, return undefined if unset.
     %% If a default is assigned and the key is not found, set the key to the
     %% default value and return the default value.
+    {F, B} = case Rule of
+                 repeated -> {"{repeated, ", "}"};
+                 _ -> {"", ""}
+             end,
+    VString = F ++ "Value" ++ B,
     Getter = case Default of
                  undefined ->
                      "g_" ++ Name ++ "(Data) ->\n"
                          "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, Value}}} -> Value;\n"
+                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> " ++ VString ++ ";\n"
                          "        false -> undefined\n"
                          "    end.\n";
                  _ ->
                      "g_" ++ Name ++ "(Data) ->\n"
                          "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, Value}}} -> Value;\n"
+                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> " ++ VString ++ ";\n"
                          "        false ->\n"
-                         "            s_" ++ Name ++ "(Data, " ++ DefaultString ++ "),\n"
-                         "            " ++ DefaultString ++ "\n"
+                         "            s_" ++ Name ++ "(Data, " ++ F ++ DefaultString ++ B ++ "),\n"
+                         "            " ++ F ++ DefaultString ++ B ++ "\n"
                          "    end.\n"
              end,
     Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
+        "    Type = case get_type(" ++ Name ++ ") of\n"
+        "               {message, _, Encode} -> {message, Encode};\n"
+        "               T -> T\n"
+        "           end,\n"
         "    lists:keystore(" ++ Name ++ ", 1, Data, {" ++ Name ++ ", {" ++ N ++
-        ", get_type(" ++ Name ++ "), Value}}).\n\n",
+        ", Type, " ++ VString ++ "}}).\n\n",
     Getter ++ Setter.
 
 %% @doc Generates forward and reverse lookups for simplicity.
