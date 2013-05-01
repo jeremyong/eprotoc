@@ -71,9 +71,8 @@ encode_message(Message) ->
 %% hidden
 -spec encode_message(list(), list()) -> list().
 encode_message([], Acc) -> Acc;
-encode_message([{_, Values}|Rest], Acc)
-  when is_list(Values) ->
-    Res = lists:map(fun({FNum, Type, Value}) ->
+encode_message([{_, {FNum, Type, {repeated, Values}}}|Rest], Acc) ->
+    Res = lists:map(fun(Value) ->
                             encode_value(FNum, Type, Value)
                     end, Values),
     encode_message(Rest, [Res|Acc]);
@@ -140,10 +139,11 @@ encode_varint(Int, Acc) ->
 %% Repeated fields are reversed upon decoding. This remedies that.
 -spec reverse_repeated_fields(list()) -> list().
 reverse_repeated_fields(Fields) ->
-    lists:map(fun({N, Fs}) ->
-                      case is_list(Fs) of
-                          true -> {N, lists:reverse(Fs)};
-                          false -> {N, Fs}
+    lists:map(fun({F, Fs}) ->
+                      case Fs of
+                          {N, T, {repeated, Vs}} ->
+                              {F, {N, T, {repeated, lists:reverse(Vs)}}};
+                          _ -> {F, Fs}
                       end
               end, Fields).
 

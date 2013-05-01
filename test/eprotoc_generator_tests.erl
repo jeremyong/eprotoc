@@ -84,35 +84,29 @@ test_decode_enum_message() ->
     ?assertEqual(Message, Result).
 
 test_encode_repeated_message() ->
-    Message = [{d, [{1, uint32, 150}, {1, uint32, 150}]}],
+    Message = [{d,{1,uint32,{repeated,[250,150]}}}],
     Result = list_to_binary(test__test4:encode(Message)),
-    ?assertEqual(<<8,150,1,8,150,1>>, Result).
+    ?assertEqual(<<8,250,1,8,150,1>>, Result).
 
 test_decode_repeated_message() ->
-    Payload = <<8,150,1,8,150,1>>,
+    Payload = <<8,250,1,8,150,1>>,
     Result = test__test4:decode(Payload),
-    Message = [{d, [{1, uint32, 150}, {1, uint32, 150}]}],
+    Message = [{d,{1,uint32,{repeated,[250,150]}}}],
     ?assertEqual(Message, Result).
 
 test_encode_nested_repeated_message() ->
-    Message = [{e,[{1,
-                    {message,fun test__test5__test6:encode/1},
-                    [{f,{1,uint32,300}}]},
-                   {1,
-                    {message,fun test__test5__test6:encode/1},
-                    [{f,{1,uint32,150}}]}]}],
+    Message = [{e,{1,
+                   {message,fun test__test5__test6:encode/1},
+                   {repeated,[[{f,{1,uint32,150}}],[{f,{1,uint32,300}}]]}}}],
     Result = list_to_binary(test__test5:encode(Message)),
-    ?assertEqual(<<10,3,8,172,2,10,3,8,150,1>>, Result).
+    ?assertEqual(<<10,3,8,150,1,10,3,8,172,2>>, Result).
 
 test_decode_nested_repeated_message() ->
-    Payload = <<10,3,8,172,2,10,3,8,150,1>>,
+    Payload = <<10,3,8,150,1,10,3,8,172,2>>,
     Result = test__test5:decode(Payload),
-    Message = [{e,[{1,
-                    {message,fun test__test5__test6:encode/1},
-                    [{f,{1,uint32,300}}]},
-                   {1,
-                    {message,fun test__test5__test6:encode/1},
-                    [{f,{1,uint32,150}}]}]}],
+    Message = [{e,{1,
+                   {message,fun test__test5__test6:encode/1},
+                   {repeated,[[{f,{1,uint32,150}}],[{f,{1,uint32,300}}]]}}}],
     ?assertEqual(Message, Result).
 
 test_encode_bool_message() ->
