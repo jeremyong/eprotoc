@@ -158,15 +158,15 @@ generate_field(Rule, Name, Num, Opts) ->
                  undefined ->
                      "g_" ++ Name ++ "(Data) ->\n"
                          "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> " ++ VString ++ ";\n"
+                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
                          "        false -> undefined\n"
                          "    end.\n";
                  _ ->
                      "g_" ++ Name ++ "(Data) ->\n"
                          "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> " ++ VString ++ ";\n"
+                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
                          "        false ->\n"
-                         "            " ++ F ++ DefaultString ++ B ++ "\n"
+                         "            " ++ DefaultString ++ "\n"
                          "    end.\n"
              end,
     Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
