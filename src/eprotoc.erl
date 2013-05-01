@@ -84,6 +84,8 @@ encode_message([{_, {FNum, Type, Value}}|Rest], Acc) ->
 -spec encode_value(integer(), atom() | function(),
                    binary() | integer() | float()) ->
     iolist().
+encode_value(_, _, undefined) ->
+    [];
 encode_value(FieldNum, {enum, EncodeFun}, Data) ->
     Num = EncodeFun(Data),
     [encode_varint((FieldNum bsl 3) bor 0),encode_varint(Num)];

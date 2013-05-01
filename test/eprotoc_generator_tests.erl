@@ -25,7 +25,9 @@ eprotoc_generator_test_() ->
       fun test_encode_nested_repeated_message/0,
       fun test_decode_nested_repeated_message/0,
       fun test_encode_bool_message/0,
-      fun test_decode_bool_message/0
+      fun test_decode_bool_message/0,
+      fun test_encode_undefined_message/0,
+      fun test_decode_undefined_message/0
      ]}.
 
 test_code_generation() ->
@@ -119,3 +121,14 @@ test_decode_bool_message() ->
     Payload = <<8,1>>,
     Result = test__test7:decode(Payload),
     ?assertEqual([{g, {1, bool, true}}], Result).
+
+test_encode_undefined_message() ->
+    %% Message Test1 with value a = 150
+    Message = [{g, {1, bool, undefined}}],
+    Result = list_to_binary(test__test7:encode(Message)),
+    ?assertEqual(<<>>, Result).
+
+test_decode_undefined_message() ->
+    Payload = <<>>,
+    Result = test__test7:decode(Payload),
+    ?assertEqual([], Result).
