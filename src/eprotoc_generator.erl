@@ -152,22 +152,22 @@ generate_field(Name, Num, Opts) ->
     Getter = case Default of
                  undefined ->
                      "g_" ++ Name ++ "(Data) ->\n"
-                         "    case lists:keysearch(" ++ N ++ ", 1, Data) of\n"
-                         "        {value, {_, _, Value}} -> Value;\n"
+                         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
+                         "        {value, {_, {_, _, Value}}} -> Value;\n"
                          "        false -> undefined\n"
                          "    end.\n";
                  _ ->
                      "g_" ++ Name ++ "(Data) ->\n"
-                         "    case lists:keysearch(" ++ N ++ ", 1, Data) of\n"
-                         "        {value, {_, _, Value}} -> Value;\n"
+                         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
+                         "        {value, {_, {_, _, Value}}} -> Value;\n"
                          "        false ->\n"
                          "            s_" ++ Name ++ "(Data, " ++ DefaultString ++ "),\n"
                          "            " ++ DefaultString ++ "\n"
                          "    end.\n"
              end,
     Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
-        "    lists:keystore(" ++ N ++ ", 1, Data, {" ++ N ++
-        ", get_type(" ++ Name ++ "), Value}).\n\n",
+        "    lists:keystore(" ++ Name ++ ", 1, Data, {" ++ Name ++ ", {" ++ N ++
+        ", get_type(" ++ Name ++ "), Value}}).\n\n",
     Getter ++ Setter.
 
 %% @doc Generates forward and reverse lookups for simplicity.

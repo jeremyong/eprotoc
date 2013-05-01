@@ -13,6 +13,9 @@ eprotoc_generator_test_() ->
       fun test_code_generation/0,
       fun test_encode_message/0,
       fun test_decode_message/0,
+      fun test_set_message/0,
+      fun test_get_message/0,
+      fun test_get_unset_message/0,
       fun test_encode_nested_message/0,
       fun test_decode_nested_message/0,
       fun test_encode_enum_message/0,
@@ -40,6 +43,20 @@ test_decode_message() ->
     Payload = <<8,150,1>>,
     Result = test__test1:decode(Payload),
     ?assertEqual([{a, {1, uint32, 150}}], Result).
+
+test_set_message() ->
+    Message = test__test1:s_a([], 5),
+    ?assertEqual([{a, {1, uint32, 5}}], Message).
+
+test_get_message() ->
+    Payload = <<8,150,1>>,
+    Result = test__test1:decode(Payload),
+    Value = test__test1:g_a(Result),
+    ?assertEqual(150, Value).
+
+test_get_unset_message() ->
+    Result = test__test7:g_g([]),
+    ?assertEqual(true, Result).
 
 test_encode_nested_message() ->
     %% Nested Test1 with value a = 150 inside Test3 message.
