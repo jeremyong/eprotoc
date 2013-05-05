@@ -81,7 +81,7 @@ encode_message([{_, {FNum, Type, Value}}|Rest], Acc) ->
     encode_message(Rest, [Res|Acc]).
 
 %% @doc Packs data along with the field num and wire type.
--spec encode_value(integer(), atom() | function(),
+-spec encode_value(integer(), atom() | tuple(),
                    binary() | integer() | float()) ->
     iolist().
 encode_value(_, _, undefined) ->
@@ -176,6 +176,7 @@ wire_encode_fun(uint64) -> fun encode_varint/1;
 wire_encode_fun(sint32) -> fun encode_sint32/1;
 wire_encode_fun(sint64) -> fun encode_sint64/1;
 wire_encode_fun(string) -> fun encode_string/1;
+wire_encode_fun(bytes) -> fun encode_string/1;
 wire_encode_fun(bool) -> fun encode_varint/1.
 
 -spec wire_decode_fun(wire_type()) -> function().
