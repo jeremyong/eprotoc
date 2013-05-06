@@ -82,7 +82,7 @@ encode_message([{_, {FNum, Type, Value}}|Rest], Acc) ->
 
 %% @doc Packs data along with the field num and wire type.
 -spec encode_value(integer(), atom() | tuple(),
-                   binary() | integer() | float()) ->
+                   binary() | integer() | float() | atom()) ->
     iolist().
 encode_value(_, _, undefined) ->
     [];
@@ -213,6 +213,8 @@ cast_type(bool, 1) ->
     true;
 cast_type(bool, 0) ->
     false;
+cast_type(bytes, Value) ->
+    Value;
 cast_type(fixed64, << Value:64/little-unsigned-integer >>) ->
     Value;
 cast_type(sfixed64, << Value:64/little-unsigned-integer >>) ->
@@ -220,7 +222,7 @@ cast_type(sfixed64, << Value:64/little-unsigned-integer >>) ->
 cast_type(double, << Value/little-float >>) ->
     Value;
 cast_type(fixed32, << Value:32/little-unsigned-integer >>) ->
-    binary:decode_unsigned(Value);
+    Value;
 cast_type(sfixed32, << Value:32/little-unsigned-integer >>) ->
     (Value bsr 1) bxor (-(Value band 1));
 cast_type(float, << Value/little-float >>) ->

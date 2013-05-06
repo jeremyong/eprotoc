@@ -31,7 +31,7 @@ generate_code(File) ->
     {_, Result} = peel(Package, {PackageName, [], []}, []),
     Result.
 
--spec parse_file(list()) -> list().
+-spec parse_file(list()) -> {ok, tuple()}.
 parse_file(File) ->
     Tokens = read_and_scan(File),
     proto_grammar:parse(Tokens).
