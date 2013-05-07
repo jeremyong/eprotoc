@@ -14,6 +14,7 @@
          encode_varint/1,
          encode_int32/1,
          encode_int64/1,
+         encode_float/1,
          reverse_repeated_fields/1,
          wire_type/1,
          wire_encode_fun/1,
@@ -137,6 +138,12 @@ encode_int64(Int) when Int < 0 ->
 encode_int64(Int) when Int >= 0 ->
     encode_varint(Int).
 
+-spec encode_float(integer() | float()) -> binary().
+encode_float(Float) when is_integer(Float) ->
+    encode_float(Float + 0.0);
+encode_float(Float) ->
+    << Float:32/little-float >>.
+
 %% hidden
 encode_varint(true, Acc) ->
     [1|Acc];
@@ -193,6 +200,7 @@ wire_encode_fun(sint32) -> fun encode_sint32/1;
 wire_encode_fun(sint64) -> fun encode_sint64/1;
 wire_encode_fun(string) -> fun encode_string/1;
 wire_encode_fun(bytes) -> fun encode_string/1;
+wire_encode_fun(float) -> fun encode_float/1;
 wire_encode_fun(bool) -> fun encode_varint/1.
 
 -spec wire_decode_fun(wire_type()) -> function().
