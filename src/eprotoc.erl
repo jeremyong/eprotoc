@@ -53,10 +53,10 @@ pop_string(Payload) ->
     << String:Len/binary-unit:8, Rest1/binary >> = Rest,
     {String, Rest1}.
 
-pop_32bits(<< Value:32/binary, Rest/binary >>) ->
+pop_32bits(<< Value:4/binary, Rest/binary >>) ->
     {Value, Rest}.
 
-pop_64bits(<< Value:64/binary, Rest/binary >>) ->
+pop_64bits(<< Value:8/binary, Rest/binary >>) ->
     {Value, Rest}.
 
 %% @doc Raw decoded messages are keylists where the keys are
