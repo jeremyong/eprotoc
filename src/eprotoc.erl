@@ -225,5 +225,12 @@ cast_type(fixed32, << Value:32/little-unsigned-integer >>) ->
     Value;
 cast_type(sfixed32, << Value:32/little-unsigned-integer >>) ->
     (Value bsr 1) bxor (-(Value band 1));
-cast_type(float, << Value/little-float >>) ->
-    Value.
+cast_type(float, Bin) ->
+    case byte_size(Bin) of
+        4 ->
+            << Value:32/little-float >> = Bin,
+            Value;
+        8 ->
+            << Value:64/little-float >> = Bin,
+            Value
+    end.
