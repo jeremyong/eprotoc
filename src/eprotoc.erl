@@ -12,6 +12,8 @@
          encode_sint32/1,
          encode_sint64/1,
          encode_varint/1,
+         encode_int32/1,
+         encode_int64/1,
          reverse_repeated_fields/1,
          wire_type/1,
          wire_encode_fun/1,
@@ -123,6 +125,18 @@ encode_sint64(SInt) when SInt =< 16#ffff, SInt >= -16#ffff ->
 encode_varint(Int) when Int >= 0 ->
     lists:reverse(encode_varint(Int, [])).
 
+-spec encode_int32(integer()) -> iolist().
+encode_int32(Int) when Int < 0 ->
+    encode_varint(Int + (1 bsl 32));
+encode_int32(Int) when Int >= 0 ->
+    encode_varint(Int).
+
+-spec encode_int64(integer()) -> iolist().
+encode_int64(Int) when Int < 0 ->
+    encode_varint(Int + (1 bsl 64));
+encode_int64(Int) when Int >= 0 ->
+    encode_varint(Int).
+
 %% hidden
 encode_varint(true, Acc) ->
     [1|Acc];
@@ -171,6 +185,8 @@ wire_type(float) -> 5;
 wire_type(_) -> custom.
 
 -spec wire_encode_fun(atom()) -> function().
+wire_encode_fun(int32) -> fun encode_int32/1;
+wire_encode_fun(int64) -> fun encode_int64/1;
 wire_encode_fun(uint32) -> fun encode_varint/1;
 wire_encode_fun(uint64) -> fun encode_varint/1;
 wire_encode_fun(sint32) -> fun encode_sint32/1;
