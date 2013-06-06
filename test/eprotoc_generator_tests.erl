@@ -16,6 +16,7 @@ eprotoc_generator_test_() ->
       fun test_set_message/0,
       fun test_get_message/0,
       fun test_get_unset_message/0,
+      fun test_get_unset_repeated_message/0,
       fun test_encode_nested_message/0,
       fun test_decode_nested_message/0,
       fun test_encode_enum_message/0,
@@ -59,6 +60,10 @@ test_get_message() ->
 test_get_unset_message() ->
     Result = test__test7:g_g([]),
     ?assertEqual(true, Result).
+
+test_get_unset_repeated_message() ->
+    Result = test__test5:g_e([]),
+    ?assertEqual([], Result).
 
 test_encode_nested_message() ->
     %% Nested Test1 with value a = 150 inside Test3 message.
