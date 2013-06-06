@@ -144,7 +144,9 @@ generate_field(Rule, Name, Num, Opts) ->
                         D when is_list(D) ->
                             "\"" ++ D ++ "\"";
                         D when is_float(D) ->
-                            float_to_list(D)
+                            float_to_list(D);
+                        D when Rule =:= repeated ->
+                            []
                     end,
     %% If no default is assigned, return undefined if unset.
     %% If a default is assigned and the key is not found, set the key to the
