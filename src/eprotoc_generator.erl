@@ -145,8 +145,8 @@ generate_field(Rule, Name, Num, Opts) ->
                             "\"" ++ D ++ "\"";
                         D when is_float(D) ->
                             float_to_list(D);
-                        D when Rule =:= repeated ->
-                            []
+                        _D when Rule =:= repeated ->
+                            "[]"
                     end,
     %% If no default is assigned, return undefined if unset.
     %% If a default is assigned and the key is not found, set the key to the
@@ -156,21 +156,12 @@ generate_field(Rule, Name, Num, Opts) ->
                  _ -> {"", ""}
              end,
     VString = F ++ "Value" ++ B,
-    Getter = case Default of
-                 undefined ->
-                     "g_" ++ Name ++ "(Data) ->\n"
-                         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
-                         "        false -> undefined\n"
-                         "    end.\n";
-                 _ ->
-                     "g_" ++ Name ++ "(Data) ->\n"
-                         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
-                         "        false ->\n"
-                         "            " ++ DefaultString ++ "\n"
-                         "    end.\n"
-             end,
+    Getter = "g_" ++ Name ++ "(Data) ->\n"
+        "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
+        "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
+        "        false ->\n"
+        "            " ++ DefaultString ++ "\n"
+        "    end.\n",
     Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
         "    Type = case get_type(" ++ Name ++ ") of\n"
         "               {message, _, Encode} -> {message, Encode};\n"
