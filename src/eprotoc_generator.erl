@@ -137,6 +137,8 @@ generate_field(Rule, Name, Num, Opts) ->
     N = integer_to_list(Num),
     Default = proplists:get_value(default, Opts),
     DefaultString = case Default of
+                        undefined when Rule =:= repeated ->
+                            "[]";
                         D when is_atom(D) ->
                             atom_to_list(Default);
                         D when is_integer(D) ->
@@ -154,21 +156,12 @@ generate_field(Rule, Name, Num, Opts) ->
                  _ -> {"", ""}
              end,
     VString = F ++ "Value" ++ B,
-    Getter = case Default of
-                 undefined ->
-                     "g_" ++ Name ++ "(Data) ->\n"
-                         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
-                         "        false -> undefined\n"
-                         "    end.\n";
-                 _ ->
-                     "g_" ++ Name ++ "(Data) ->\n"
-                         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
-                         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
-                         "        false ->\n"
-                         "            " ++ DefaultString ++ "\n"
-                         "    end.\n"
-             end,
+    Getter = "g_" ++ Name ++ "(Data) ->\n"
+        "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
+        "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
+        "        false ->\n"
+        "            " ++ DefaultString ++ "\n"
+        "    end.\n",
     Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
         "    Type = case get_type(" ++ Name ++ ") of\n"
         "               {message, _, Encode} -> {message, Encode};\n"
