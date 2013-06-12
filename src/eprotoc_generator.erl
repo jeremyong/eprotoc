@@ -204,10 +204,8 @@ generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
 generate_message(Fields, Enums, Messages) ->
     FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
     {FieldRules, RuleString} = generate_message_rules(FieldsOnly, {[],""}),
-
     GenGets = generate_gen_gets(FieldsOnly, ""),
     GenSets = generate_gen_sets(FieldsOnly, ""),
-
     FieldRulesString = io_lib:format("~w", [FieldRules]),
     generate_message_lookups(FieldsOnly, "") ++
         RuleString ++
@@ -258,10 +256,12 @@ generate_message(Fields, Enums, Messages) ->
         "            {error, E}\n"
         "    end.\n\n" ++
         GenGets ++ GenSets ++
+        "-spec mget(Data :: list(), Fields :: list(atom())) -> list(tuple()).\n"
         "mget(Data, Fields) ->\n"
-        "    lists:map(fun(Field) -> get(Data,Field) end, Fields).\n\n"
+        "    [get(Data,Field) || Field <- Fields].\n\n"
+        "-spec mset(Data :: list(), L :: list(tuple())) -> list().\n"
         "mset(Data, L) ->\n"
-        "    lists:foldr(fun({Field, Value}, Acc) -> set(Acc, Field, Value) end, Data, L).\n\n".
+        "    lists:foldl(fun({Field, Value}, Acc) -> set(Acc, Field, Value) end, Data, L).\n\n".
 
 generate_gen_gets([], _) -> "";
 generate_gen_gets([{field,_,_,FieldAtom,_,_}],Acc) ->

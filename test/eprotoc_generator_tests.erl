@@ -166,7 +166,7 @@ test_extraneous_field() ->
 
 test_mset() ->
     Message = test__test8:mset([], [{h,42},{i,43}]),
-    ?assertEqual([{i, {2, uint32, 43}}, {h, {1, uint32, 42}}], Message).
+    ?assertEqual([{h, {1, uint32, 42}}, {i, {2, uint32, 43}}], Message).
 
 test_mget() ->
     Paylod = <<8,5,16,7>>,
