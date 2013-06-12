@@ -203,8 +203,10 @@ generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
 
 generate_message(Fields, Enums, Messages) ->
     FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
+    {FieldRules, RuleString} = generate_message_rules(FieldsOnly, {[],""}),
+    FieldRulesString = io_lib:format("~w", [FieldRules]),
     generate_message_lookups(FieldsOnly, "") ++
-        generate_message_rules(FieldsOnly, "") ++
+        RuleString ++
         generate_message_types(FieldsOnly, "", Enums, Messages) ++
         "-spec decode(Payload :: binary()) -> list().\n"
         "decode(Payload) ->\n"
@@ -242,9 +244,15 @@ generate_message(Fields, Enums, Messages) ->
         "                   end,\n"
         "            map_values(Rest, Acc1)\n"
         "    end.\n\n"
-        "-spec encode(Data :: list()) -> iolist().\n"
+        "-spec encode(Data :: list()) -> iolist() | {error, Reason :: term()}.\n"
         "encode(Data) ->\n"
-        "    eprotoc:encode_message(Data).\n\n".
+        "    FieldRules = " ++ FieldRulesString ++ ",\n"
+        "    case eprotoc:check_fields(Data, FieldRules) of\n"
+        "        ok -> \n"
+        "            eprotoc:encode_message(Data);\n"
+        "        {error, E} ->\n"
+        "            {error, E}\n"
+        "    end.\n\n".
 
 %% No fields in message, nothing to do.
 generate_message_lookups([], _) -> "";
@@ -258,14 +266,14 @@ generate_message_lookups([{field, _, _, FieldAtom, Num, _}|Rest], Acc) ->
     generate_message_lookups(Rest, Acc1).
 
 %% No fields in message, nothing to do.
-generate_message_rules([], _) -> "";
-generate_message_rules([{field, Rule, _, FieldAtom, _, _}], Acc) ->
+generate_message_rules([], _) -> {[],""};
+generate_message_rules([{field, Rule, _, FieldAtom, _, _}], {L,Acc}) ->
     Name = atom_to_name(FieldAtom),
-    Acc ++ "get_rule(" ++ Name ++ ") -> " ++ atom_to_list(Rule) ++ ".\n\n";
-generate_message_rules([{field, Rule, _, FieldAtom, _, _}|Rest], Acc) ->
+    {[{FieldAtom,Rule}|L],Acc ++ "get_rule(" ++ Name ++ ") -> " ++ atom_to_list(Rule) ++ ".\n\n"};
+generate_message_rules([{field, Rule, _, FieldAtom, _, _}|Rest], {L,Acc}) ->
     Name = atom_to_name(FieldAtom),
     Acc1 = Acc ++ "get_rule(" ++ Name ++ ") -> " ++ atom_to_list(Rule) ++ ";\n",
-    generate_message_rules(Rest, Acc1).
+    generate_message_rules(Rest, {[{FieldAtom,Rule}|L], Acc1}).
 
 %% No fields in message, nothing to do.
 generate_message_types([], _, _, _) -> "";

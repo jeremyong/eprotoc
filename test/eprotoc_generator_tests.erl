@@ -28,7 +28,9 @@ eprotoc_generator_test_() ->
       fun test_encode_bool_message/0,
       fun test_decode_bool_message/0,
       fun test_encode_undefined_message/0,
-      fun test_decode_undefined_message/0
+      fun test_decode_undefined_message/0,
+      fun test_missing_required_field/0,
+      fun test_extraneous_field/0
      ]}.
 
 test_code_generation() ->
@@ -137,3 +139,14 @@ test_decode_undefined_message() ->
     Payload = <<>>,
     Result = test__test7:decode(Payload),
     ?assertEqual([], Result).
+
+test_missing_required_field() ->
+    Message = [],
+    Result = test__test1:encode(Message),
+    ?assertMatch({error,{{missing,[{a,_}]},{extra,[]}}}, Result).
+
+test_extraneous_field() ->
+    Message = [{a, {1, uint32, 150}}, {b, {2, uint32, 42}}],
+    Result = test__test1:encode(Message),
+    ?assertMatch({error,{{missing,[]},{extra,[{b,_}]}}}, Result).
+
