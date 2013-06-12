@@ -1,6 +1,7 @@
 -module(eprotoc).
 
 -export([
+         check_fields/2,
          decode_message/1,
          pop_varint/1,
          pop_string/1,
@@ -23,6 +24,28 @@
         ]).
 
 -type wire_type() :: 0 | 1 | 2 | 5.
+
+-spec check_is_keymember_subset(Set :: list(), list()) -> list().
+check_is_keymember_subset(Set, Subset) ->
+    lists:filter(fun({Elem,_}) ->
+                      not lists:keymember(Elem, 1, Set)
+                 end, Subset).
+
+%% @doc Verfies that the encoded message Data is correct according to 
+%% the rules of the message. The required fields should be a subset of
+%% the fields in the encoded message, and the fields in the encoded
+%% message should be a subset of all the fields according to the rules
+%% of the message.
+-spec check_fields(Data :: list(), FieldRules :: list()) -> ok | {error, Reason :: term()}.
+check_fields(Data, FieldRules) ->
+    RequiredFields = lists:filter(fun({_,R}) -> R =:= required end, FieldRules),
+    case {check_is_keymember_subset(Data, RequiredFields),
+          check_is_keymember_subset(FieldRules, Data)} of
+        {[], []} ->
+            ok;
+        {Missing, Extra} ->
+            {error, {{missing, Missing},{extra, Extra}}}
+    end.
 
 %% @doc Decodes a supplied binary message into a list of values.
 %% Each value is of the form {field num, wire type, Value}.
