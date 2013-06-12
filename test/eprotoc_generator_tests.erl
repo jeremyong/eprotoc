@@ -32,7 +32,9 @@ eprotoc_generator_test_() ->
       fun test_encode_undefined_message/0,
       fun test_decode_undefined_message/0,
       fun test_missing_required_field/0,
-      fun test_extraneous_field/0
+      fun test_extraneous_field/0,
+      fun test_mset/0,
+      fun test_mget/0
      ]}.
 
 test_code_generation() ->
@@ -162,3 +164,12 @@ test_extraneous_field() ->
     Result = test__test1:encode(Message),
     ?assertMatch({error,{{missing,[]},{extra,[{b,_}]}}}, Result).
 
+test_mset() ->
+    Message = test__test8:mset([], [{h,42},{i,43}]),
+    ?assertEqual([{i, {2, uint32, 43}}, {h, {1, uint32, 42}}], Message).
+
+test_mget() ->
+    Paylod = <<8,5,16,7>>,
+    Result = test__test8:decode(Paylod),
+    Value = test__test8:mget(Result, [h,i]),
+    ?assertEqual([5,7], Value).

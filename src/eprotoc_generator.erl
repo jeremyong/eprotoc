@@ -257,7 +257,11 @@ generate_message(Fields, Enums, Messages) ->
         "        {error, E} ->\n"
         "            {error, E}\n"
         "    end.\n\n" ++
-        GenGets ++ GenSets.
+        GenGets ++ GenSets ++
+        "mget(Data, Fields) ->\n"
+        "    lists:map(fun(Field) -> get(Data,Field) end, Fields).\n\n"
+        "mset(Data, L) ->\n"
+        "    lists:foldr(fun({Field, Value}, Acc) -> set(Acc, Field, Value) end, Data, L).\n\n".
 
 generate_gen_gets([], _) -> "";
 generate_gen_gets([{field,_,_,FieldAtom,_,_}],Acc) ->
