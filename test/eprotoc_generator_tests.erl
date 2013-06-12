@@ -15,6 +15,8 @@ eprotoc_generator_test_() ->
       fun test_decode_message/0,
       fun test_set_message/0,
       fun test_get_message/0,
+      fun test_generic_set_message/0,
+      fun test_generic_get_message/0,
       fun test_get_unset_message/0,
       fun test_get_unset_repeated_message/0,
       fun test_encode_nested_message/0,
@@ -57,6 +59,16 @@ test_get_message() ->
     Payload = <<8,150,1>>,
     Result = test__test1:decode(Payload),
     Value = test__test1:g_a(Result),
+    ?assertEqual(150, Value).
+
+test_generic_set_message() ->
+    Message = test__test1:set([], a, 5),
+    ?assertEqual([{a, {1, uint32, 5}}], Message).
+
+test_generic_get_message() ->
+    Payload = <<8,150,1>>,
+    Result = test__test1:decode(Payload),
+    Value = test__test1:get(Result, a),
     ?assertEqual(150, Value).
 
 test_get_unset_message() ->

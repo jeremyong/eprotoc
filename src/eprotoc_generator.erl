@@ -204,6 +204,10 @@ generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
 generate_message(Fields, Enums, Messages) ->
     FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
     {FieldRules, RuleString} = generate_message_rules(FieldsOnly, {[],""}),
+
+    GenGets = generate_gen_gets(FieldsOnly, ""),
+    GenSets = generate_gen_sets(FieldsOnly, ""),
+
     FieldRulesString = io_lib:format("~w", [FieldRules]),
     generate_message_lookups(FieldsOnly, "") ++
         RuleString ++
@@ -252,7 +256,27 @@ generate_message(Fields, Enums, Messages) ->
         "            eprotoc:encode_message(Data);\n"
         "        {error, E} ->\n"
         "            {error, E}\n"
-        "    end.\n\n".
+        "    end.\n\n" ++
+        GenGets ++ GenSets.
+
+generate_gen_gets([], _) -> "";
+generate_gen_gets([{field,_,_,FieldAtom,_,_}],Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc ++ "get(Data, " ++ Name ++ ") -> g_" ++ Name ++ "(Data).\n\n";
+generate_gen_gets([{field,_,_,FieldAtom,_,_}|Rest],Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc1 = Acc ++ "get(Data, " ++ Name ++ ") -> g_" ++ Name ++ "(Data);\n",
+    generate_gen_gets(Rest, Acc1).
+
+generate_gen_sets([], _) -> "";
+generate_gen_sets([{field,_,_,FieldAtom,_,_}],Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc ++ "set(Data, " ++ Name ++ ", Value) -> s_" ++ Name ++ "(Data, Value).\n\n";
+generate_gen_sets([{field,_,_,FieldAtom,_,_}|Rest],Acc) ->
+    Name = atom_to_name(FieldAtom),
+    Acc1 = Acc ++ "set(Data, " ++ Name ++ ", Value) -> s_" ++ Name ++ "(Data, Value);\n",
+    generate_gen_sets(Rest, Acc1).
+
 
 %% No fields in message, nothing to do.
 generate_message_lookups([], _) -> "";
