@@ -125,15 +125,27 @@ peel([{message, Message, {Enums, Fields}}|MFs],
     %% are thrown away!
     AccMessages2 = [{Level1, Message}|AccMessages],
     peel(MFs, {Level, AccEnums, AccMessages2}, [{Level1, Text}|Acc1]);
-peel([{field, Rule, _Type, AtomName, Num, Opts}|MFs],
+peel([{field, Rule, Type, AtomName, Num, Opts}|MFs],
      {Level, AccEnums, AccMessages}, Acc) ->
     Name = atom_to_list(AtomName),
-    Text = generate_field(Rule, Name, Num, Opts),
+    Text = generate_field(Rule, Name, Num, Opts, Type),
     Acc1 = [{Level, Text}|Acc],
     peel(MFs, {Level, AccEnums, AccMessages}, Acc1).
 
+%% @doc Determine the corresponding Erlang type for each .proto type.
+erlang_type(int32) -> "integer()";
+erlang_type(uint32) -> "integer()";
+erlang_type(sint32) -> "integer()";
+erlang_type(int64) -> "integer()";
+erlang_type(uint64) -> "integer()";
+erlang_type(sint64) -> "integer()";
+erlang_type(bool) -> "boolean()";
+erlang_type(string) -> "binary()";
+erlang_type(bytes) -> "binary()";
+erlang_type(_) -> "term()".
+
 %% @doc Supply getter and setter functions for the specified field
-generate_field(Rule, Name, Num, Opts) ->
+generate_field(Rule, Name, Num, Opts, Type) ->
     N = integer_to_list(Num),
     Default = proplists:get_value(default, Opts),
     DefaultString = case Default of
@@ -156,13 +168,19 @@ generate_field(Rule, Name, Num, Opts) ->
                  _ -> {"", ""}
              end,
     VString = F ++ "Value" ++ B,
-    Getter = "g_" ++ Name ++ "(Data) ->\n"
+    ValueType = case {Rule, erlang_type(Type)} of
+                    {repeated, T} -> "list(" ++ T ++ ")";
+                    {_, T} -> T
+                end,
+    Getter = "-spec g_" ++ Name ++ "(Data :: list()) -> " ++ ValueType ++ " | list().\n"
+        "g_" ++ Name ++ "(Data) ->\n"
         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
         "        false ->\n"
         "            " ++ DefaultString ++ "\n"
         "    end.\n",
-    Setter = "s_" ++ Name ++ "(Data, Value) ->\n"
+    Setter = "-spec s_" ++ Name ++ "(Data :: list(), Value :: " ++ ValueType ++ ") -> list().\n"
+        "s_" ++ Name ++ "(Data, Value) ->\n"
         "    Type = case get_type(" ++ Name ++ ") of\n"
         "               {message, _, Encode} -> {message, Encode};\n"
         "               T -> T\n"
