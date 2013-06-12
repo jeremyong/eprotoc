@@ -2,6 +2,7 @@
 
 all:
 	rebar compile
+	dialyzer ebin/
 
 clean:
 	rm -rf ebin .eunit
