@@ -15,6 +15,8 @@ eprotoc_generator_test_() ->
       fun test_decode_message/0,
       fun test_set_message/0,
       fun test_get_message/0,
+      fun test_generic_set_message/0,
+      fun test_generic_get_message/0,
       fun test_get_unset_message/0,
       fun test_get_unset_repeated_message/0,
       fun test_encode_nested_message/0,
@@ -30,7 +32,9 @@ eprotoc_generator_test_() ->
       fun test_encode_undefined_message/0,
       fun test_decode_undefined_message/0,
       fun test_missing_required_field/0,
-      fun test_extraneous_field/0
+      fun test_extraneous_field/0,
+      fun test_mset/0,
+      fun test_mget/0
      ]}.
 
 test_code_generation() ->
@@ -57,6 +61,16 @@ test_get_message() ->
     Payload = <<8,150,1>>,
     Result = test__test1:decode(Payload),
     Value = test__test1:g_a(Result),
+    ?assertEqual(150, Value).
+
+test_generic_set_message() ->
+    Message = test__test1:set([], a, 5),
+    ?assertEqual([{a, {1, uint32, 5}}], Message).
+
+test_generic_get_message() ->
+    Payload = <<8,150,1>>,
+    Result = test__test1:decode(Payload),
+    Value = test__test1:get(Result, a),
     ?assertEqual(150, Value).
 
 test_get_unset_message() ->
@@ -150,3 +164,12 @@ test_extraneous_field() ->
     Result = test__test1:encode(Message),
     ?assertMatch({error,{{missing,[]},{extra,[{b,_}]}}}, Result).
 
+test_mset() ->
+    Message = test__test8:mset([], [{h,42},{i,43}]),
+    ?assertEqual([{h, {1, uint32, 42}}, {i, {2, uint32, 43}}], Message).
+
+test_mget() ->
+    Paylod = <<8,5,16,7>>,
+    Result = test__test8:decode(Paylod),
+    Value = test__test8:mget(Result, [h,i]),
+    ?assertEqual([5,7], Value).

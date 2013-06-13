@@ -29,3 +29,8 @@ message Test5 {
 message Test7 {
     optional bool g = 1 [default = true];
 }
+
+message Test8 {
+    required uint32 h = 1;
+    required uint32 i = 2;
+}
