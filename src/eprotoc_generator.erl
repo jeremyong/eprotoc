@@ -172,7 +172,13 @@ generate_field(Rule, Name, Num, Opts, Type) ->
                     {repeated, T} -> "list(" ++ T ++ ")";
                     {_, T} -> T
                 end,
-    Getter = "-spec g_" ++ Name ++ "(Data :: list()) -> " ++ ValueType ++ " | list().\n"
+    ReturnType = case Default of
+                     undefined when Rule /= repeated ->
+                         ValueType ++ " | undefined";
+                     _ ->
+                         ValueType
+                 end,
+    Getter = "-spec g_" ++ Name ++ "(Data :: list()) -> " ++ ReturnType ++ ".\n"
         "g_" ++ Name ++ "(Data) ->\n"
         "    case lists:keysearch(" ++ Name ++ ", 1, Data) of\n"
         "        {value, {_, {_, _, " ++ VString ++ "}}} -> Value;\n"
@@ -256,7 +262,7 @@ generate_message(Fields, Enums, Messages) ->
         "            {error, E}\n"
         "    end.\n\n" ++
         GenGets ++ GenSets ++
-        "-spec mget(Data :: list(), Fields :: list(atom())) -> list(tuple()).\n"
+        "-spec mget(Data :: list(), Fields :: list(atom())) -> list().\n"
         "mget(Data, Fields) ->\n"
         "    [get(Data,Field) || Field <- Fields].\n\n"
         "-spec mset(Data :: list(), L :: list(tuple())) -> list().\n"
