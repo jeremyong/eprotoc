@@ -28,7 +28,7 @@ generate_code(File) ->
     {ok, Proto} = parse_file(File),
     PackageName = atom_to_name(element(1, Proto)),
     Package = element(2, Proto),
-    {_, Result} = peel(Package, {PackageName, [], []}, []),
+    {_, Result} = peel(Package, {PackageName, [], []}, [], Proto),
     Result.
 
 -spec parse_file(list()) -> {ok, tuple()}.
@@ -87,20 +87,20 @@ get_filepath(Dir, File) ->
 %% The nesting level doubles as the module name of the current scope
 %% This code essentially functions like an onion (albeit a complicated one),
 %% hence the name.
-peel({[], []}, NestingAcc, Acc) -> {NestingAcc, Acc};
-peel([], NestingAcc, Acc) -> {NestingAcc, Acc};
+peel({[], []}, NestingAcc, Acc, _) -> {NestingAcc, Acc};
+peel([], NestingAcc, Acc, _) -> {NestingAcc, Acc};
 %% Peel all enums first
 peel({[{enum, Enum, Fields}|Enums], MFs},
-     {Level, AccEnums, AccMessages}, Acc) ->
+     {Level, AccEnums, AccMessages}, Acc, Proto) ->
     EnumName = atom_to_name(Enum),
     Text = generate_enum(EnumName, Fields, ""),
     Acc1 = [{Level, Text}|Acc],
     %% Make this enum available to everything at this nesting level or deeper.
     AccEnums1 = [{Level, Enum}|AccEnums],
-    peel({Enums, MFs}, {Level, AccEnums1, AccMessages}, Acc1);
+    peel({Enums, MFs}, {Level, AccEnums1, AccMessages}, Acc1, Proto);
 %% Because we parse a message immediately, we need to look ahead to find messages
 %% at the same nesting level. We do this right after parsing the enums.
-peel({[], MFs}, {Level, AccEnums, AccMessages}, Acc) ->
+peel({[], MFs}, {Level, AccEnums, AccMessages}, Acc, Proto) ->
     Messages = lists:filter(fun(MF) ->
                                     element(1, MF) == message
                             end, MFs),
@@ -110,27 +110,27 @@ peel({[], MFs}, {Level, AccEnums, AccMessages}, Acc) ->
                                   {Level ++ "__" ++ MessageName, MessageAtom}
                           end, Messages),
     AccMessages1 = Messages1 ++ AccMessages,
-    peel(MFs, {Level, AccEnums, AccMessages1}, Acc);
+    peel(MFs, {Level, AccEnums, AccMessages1}, Acc, Proto);
 peel([{message, Message, {Enums, Fields}}|MFs],
-     {Level, AccEnums, AccMessages}, Acc) ->
+     {Level, AccEnums, AccMessages}, Acc, Proto) ->
     MessageName = atom_to_name(Message),
     Level1 = Level ++ "__" ++ MessageName,
     %% Generate message encoding and decoding functions with everything available
     %% at this level of nesting thus far.
     {{_, AccEnums1, AccMessages1}, Acc1} =
-        peel({Enums, Fields}, {Level1, AccEnums, AccMessages}, Acc),
-    Text = generate_message(Fields, AccEnums1, AccMessages1),
+        peel({Enums, Fields}, {Level1, AccEnums, AccMessages}, Acc, Proto),
+    Text = generate_message(Fields, AccEnums1, AccMessages1, Proto),
     %% Make this message available to everything at this nesting level or deeper.
     %% Note that the messages added to the scope when parsing the message contents
     %% are thrown away!
     AccMessages2 = [{Level1, Message}|AccMessages],
-    peel(MFs, {Level, AccEnums, AccMessages2}, [{Level1, Text}|Acc1]);
+    peel(MFs, {Level, AccEnums, AccMessages2}, [{Level1, Text}|Acc1], Proto);
 peel([{field, Rule, Type, AtomName, Num, Opts}|MFs],
-     {Level, AccEnums, AccMessages}, Acc) ->
+     {Level, AccEnums, AccMessages}, Acc, Proto) ->
     Name = atom_to_list(AtomName),
     Text = generate_field(Rule, Name, Num, Opts, Type),
     Acc1 = [{Level, Text}|Acc],
-    peel(MFs, {Level, AccEnums, AccMessages}, Acc1).
+    peel(MFs, {Level, AccEnums, AccMessages}, Acc1, Proto).
 
 %% @doc Determine the corresponding Erlang type for each .proto type.
 erlang_type(int32) -> "integer()";
@@ -207,7 +207,7 @@ generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
     Acc2 = Acc1 ++ Name ++ "_enum(" ++ Value ++ ") -> " ++ Field ++ ";\n",
     generate_enum(Name, Fields, Acc2).
 
-generate_message(Fields, Enums, Messages) ->
+generate_message(Fields, Enums, Messages, Proto) ->
     FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
     {FieldRules, RuleString} = generate_message_rules(FieldsOnly, {[],""}),
     GenGets = generate_gen_gets(FieldsOnly, ""),
@@ -215,7 +215,7 @@ generate_message(Fields, Enums, Messages) ->
     FieldRulesString = io_lib:format("~w", [FieldRules]),
     generate_message_lookups(FieldsOnly, "") ++
         RuleString ++
-        generate_message_types(FieldsOnly, "", Enums, Messages) ++
+        generate_message_types(FieldsOnly, "", Enums, Messages, Proto) ++
         "-spec decode(Payload :: binary()) -> list().\n"
         "decode(Payload) ->\n"
         "    Raw = eprotoc:decode_message(Payload),\n"
@@ -310,20 +310,78 @@ generate_message_rules([{field, Rule, _, FieldAtom, _, _}|Rest], {L,Acc}) ->
     generate_message_rules(Rest, {[{FieldAtom,Rule}|L], Acc1}).
 
 %% No fields in message, nothing to do.
-generate_message_types([], _, _, _) -> "";
+generate_message_types([], _, _, _, _) -> "";
 generate_message_types([{field, _, Type, FieldAtom, _, _}],
-                       Acc, Enums, Messages) ->
+                       Acc, Enums, Messages, Proto) ->
     Name = atom_to_name(FieldAtom),
     Acc ++ "get_type(" ++ Name ++ ") -> " ++
-        get_field_type(Type, Enums, Messages) ++ ".\n\n";
+        get_field_type(Type, Enums, Messages, Proto) ++ ".\n\n";
 generate_message_types([{field, _, Type, FieldAtom, _, _}|Rest],
-                       Acc, Enums, Messages) ->
+                       Acc, Enums, Messages, Proto) ->
     Name = atom_to_name(FieldAtom),
     Acc1 = Acc ++ "get_type(" ++ Name ++ ") -> " ++
-        get_field_type(Type, Enums, Messages) ++ ";\n",
-    generate_message_types(Rest, Acc1, Enums, Messages).
+        get_field_type(Type, Enums, Messages, Proto) ++ ";\n",
+    generate_message_types(Rest, Acc1, Enums, Messages, Proto).
 
-get_field_type(TypeAtom, Enums, Messages) ->
+%% Search the messages of parsed proto file for the nested Enum definition.
+-spec enum_search(term(), list(), list()) -> {list(),list()} | false.
+enum_search({nested,Inside,Type}, Msgs, Acc) ->
+    case lists:keyfind(Inside, 2, Msgs) of
+        {message, _, {Enums, Msgs1}} ->
+            case Type of
+                {nested,_,_} ->
+                    enum_search(Type, Msgs1, Acc ++ "__" ++ atom_to_name(Inside));
+                _ ->
+                    enum_search(Type, Enums, Acc ++ "__" ++ atom_to_name(Inside))
+            end;
+        _ ->
+            false
+    end;
+enum_search(Type, Enums, Acc) ->
+    case lists:keyfind(Type, 2, Enums) of
+        {enum, _, _} ->
+            {Acc, atom_to_name(Type)};
+        _ ->
+            false
+    end.
+
+%% Search the messages of parsed proto file for the nested Message definition.
+-spec message_search(term(), list(), list()) -> list() | false.
+message_search({nested,Inside,Type}, Msgs, Acc) ->
+    case lists:keyfind(Inside, 2, Msgs) of
+        {message, _, {_, Msgs1}} ->
+            message_search(Type, Msgs1, Acc ++ atom_to_name(Inside) ++ "__");
+        _ ->
+            false
+    end;
+message_search(Type, Msgs, Acc) ->
+    case lists:keyfind(Type, 2, Msgs) of
+        {message, _, _} ->
+            Acc ++ atom_to_name(Type);
+        _ ->
+            false
+    end.
+
+nested_atom_to_name({nested,Inside,Type},Acc) ->
+    nested_atom_to_name(Type,Acc ++ atom_to_name(Inside) ++ "__");
+nested_atom_to_name(Type,Acc) ->
+    Acc ++ atom_to_name(Type).
+
+get_field_type({nested,Inside,Type}, _, _, Proto) ->
+    PackageName = atom_to_name(element(1,Proto)),
+    Msgs = element(2,element(2,Proto)),
+    case {message_search({nested,Inside,Type}, Msgs, PackageName ++ "__"),
+          enum_search({nested,Inside,Type}, Msgs, PackageName)} of
+        {false,false} ->
+            throw("Nested message type or enum " ++ nested_atom_to_name({nested,Inside,Type},"") ++ " not found.");
+        {Level,false} ->
+            "{message, fun " ++ Level ++ ":decode/1, fun " ++ Level ++ ":encode/1}";
+        {false,{Level,Enum}} ->
+            "{enum, fun " ++ Level ++ ":" ++ Enum ++ "_enum/1}";
+        {_,_} ->
+            throw("Ambiguous messagae or enum type " ++ Type ++ ".")
+    end;
+get_field_type(TypeAtom, Enums, Messages, _) ->
     Type = atom_to_name(TypeAtom),
     case eprotoc:wire_type(TypeAtom) of
         custom ->
