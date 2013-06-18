@@ -34,3 +34,11 @@ message Test8 {
     required uint32 h = 1;
     required uint32 i = 2;
 }
+
+message Test9 {
+    required Test2.Foo j = 1;
+}
+
+message Test10 {
+    required Test5.Test6 k = 1;
+}
