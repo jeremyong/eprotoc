@@ -8,7 +8,7 @@ fields field field_rule field_num field_type field_name
 options option.
 
 Terminals
-';' '=' '{' '}' '[' ']' ','
+';' '=' '{' '}' '[' ']' ',' '.'
 package default packed message
 enum atom string integer float var bool true false.
 
@@ -42,6 +42,7 @@ field_rule -> atom : value_of('$1').
 
 field_type -> atom : value_of('$1').
 field_type -> var : value_of('$1').
+field_type -> var '.' field_type : {nested, value_of('$1'), '$3'}.
 
 field_name -> atom : value_of('$1').
 

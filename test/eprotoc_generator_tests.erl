@@ -34,7 +34,11 @@ eprotoc_generator_test_() ->
       fun test_missing_required_field/0,
       fun test_extraneous_field/0,
       fun test_mset/0,
-      fun test_mget/0
+      fun test_mget/0,
+      fun test_encode_dot_syntax_enum/0,
+      fun test_decode_dot_syntax_enum/0,
+      fun test_encode_dot_syntax_msg/0,
+      fun test_decode_dot_syntax_msg/0
      ]}.
 
 test_code_generation() ->
@@ -169,7 +173,33 @@ test_mset() ->
     ?assertEqual([{h, {1, uint32, 42}}, {i, {2, uint32, 43}}], Message).
 
 test_mget() ->
-    Paylod = <<8,5,16,7>>,
-    Result = test__test8:decode(Paylod),
+    Payload = <<8,5,16,7>>,
+    Result = test__test8:decode(Payload),
     Value = test__test8:mget(Result, [h,i]),
     ?assertEqual([5,7], Value).
+
+test_encode_dot_syntax_enum() ->
+    Message = [{j,{1,{enum, fun test__test2:foo_enum/1}, bar}}],
+    Result = list_to_binary(test__test9:encode(Message)),
+    ?assertEqual(<<8,150,1>>, Result).
+
+test_decode_dot_syntax_enum() ->
+    Payload = <<8,150,1>>,
+    Result = test__test9:decode(Payload),
+    Expected = [{j,{1,{enum, fun test__test2:foo_enum/1}, bar}}],
+    ?assertEqual(Result, Expected).
+
+test_encode_dot_syntax_msg() ->
+    Message = [{k,{1,
+                   {message,fun test__test5__test6:encode/1},
+                   [{f,{1,uint32,150}}]}}],
+    Result = list_to_binary(test__test10:encode(Message)),
+    ?assertEqual(<<10,3,8,150,1>>, Result).
+
+test_decode_dot_syntax_msg() ->
+    Payload = <<10,3,8,150,1>>,
+    Result = test__test10:decode(Payload),
+    Expected = [{k,{1,
+                   {message,fun test__test5__test6:encode/1},
+                   [{f,{1,uint32,150}}]}}],
+    ?assertEqual(Expected, Result).
