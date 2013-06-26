@@ -134,13 +134,14 @@ encode_string(String) ->
 
 %% @doc Signed integers are spiralled and varint encoded.
 -spec encode_sint32(integer()) -> iolist().
-encode_sint32(SInt) when SInt =< 16#ff, SInt >= -16#ff ->
+encode_sint32(SInt) when SInt =< 16#80000000, SInt >= -16#7fffffff ->
     Int = (SInt bsl 1) bxor (SInt bsr 31),
     encode_varint(Int).
 
 %% @doc Signed integers are spiralled and varint encoded.
 -spec encode_sint64(integer()) -> iolist().
-encode_sint64(SInt) when SInt =< 16#ffff, SInt >= -16#ffff ->
+encode_sint64(SInt) when SInt =< 16#8000000000000000,
+                         SInt >= -16#7fffffffffffffff ->
     Int = (SInt bsl 1) bxor (SInt bsr 63),
     encode_varint(Int).
 
