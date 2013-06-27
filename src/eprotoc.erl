@@ -25,10 +25,15 @@
 
 -type wire_type() :: 0 | 1 | 2 | 5.
 
--spec check_is_keymember_subset(Set :: list(), list()) -> list().
-check_is_keymember_subset(Set, Subset) ->
+%% Computes the list formed from taking the tuples in Subset whose keys do not
+%% appear as keys in Set.
+-spec keymember_set_difference(Set :: list(), Subset :: list()) -> list().
+keymember_set_difference(Set, Subset) ->
     lists:filter(fun({Elem,_}) ->
-                      not lists:keymember(Elem, 1, Set)
+                         not lists:keymember(Elem, 1, Set);
+                    (E)->
+                         error_logger:error_msg("~p is not a keyed tuple", [E]),
+                         false
                  end, Subset).
 
 %% @doc Verfies that the encoded message Data is correct according to 
@@ -39,8 +44,8 @@ check_is_keymember_subset(Set, Subset) ->
 -spec check_fields(Data :: list(), FieldRules :: list()) -> ok | {error, Reason :: term()}.
 check_fields(Data, FieldRules) ->
     RequiredFields = lists:filter(fun({_,R}) -> R =:= required end, FieldRules),
-    case {check_is_keymember_subset(Data, RequiredFields),
-          check_is_keymember_subset(FieldRules, Data)} of
+    case {keymember_set_difference(Data, RequiredFields),
+          keymember_set_difference(FieldRules, Data)} of
         {[], []} ->
             ok;
         {Missing, Extra} ->
