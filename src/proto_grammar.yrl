@@ -9,12 +9,15 @@ options option.
 
 Terminals
 ';' '=' '{' '}' '[' ']' ',' '.'
-package default packed message
+package default packed message import
 enum atom string integer float var bool true false.
 
 Rootsymbol proto.
 
-proto -> package var ';' messages : {value_of('$2'), '$4'}.
+proto -> package var ';' imports messages : {value_of('$2'), '$4', '$5'}.
+
+imports -> import string ';' imports : [value_of('$2') | '$4'].
+imports -> '$empty' : [].
 
 messages -> p_enum : {['$1'], []}.
 messages -> p_message : {[], ['$1']}.

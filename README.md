@@ -69,21 +69,13 @@ This creates an `iolist` representing a `Bar` message with `zap` set
 to `100` that can then be sent over the wire.
 
 See the `test` folder for examples of enum usage, the repeated field,
-nested messages, and more.
+nested messages, imported messages, and more.
 
 ## known caveats
 
-- does not yet support dot syntax for referencing nested messages or
-  enums outside the current scope
-- does not yet support imports of external proto messages
-- missing type validation and rule validation
 - missing tests on a number of data types and cases of more extreme
   nesting
 
 ## roadmap
 
 1. Add more tests
-2. Handle dot syntax and imports
-3. Make functions more strict in the the types they accept
-4. Honor rule restrictions upon encode attempt
-5. ...

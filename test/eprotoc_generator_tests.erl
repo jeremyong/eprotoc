@@ -38,13 +38,17 @@ eprotoc_generator_test_() ->
       fun test_encode_dot_syntax_enum/0,
       fun test_decode_dot_syntax_enum/0,
       fun test_encode_dot_syntax_msg/0,
-      fun test_decode_dot_syntax_msg/0
+      fun test_decode_dot_syntax_msg/0,
+      fun test_encode_imported_msg/0,
+      fun test_decode_imported_msg/0,
+      fun test_encode_nested_imported_msg/0,
+      fun test_decode_nested_imported_msg/0
      ]}.
 
 test_code_generation() ->
     %% Not an actual test per se but gives an idea of code coverage
     %% on the generator code and ensures that the generation doesn't error
-    eprotoc_generator:process_file("../test/test.proto", "/dev/null").
+    eprotoc_generator:process_file("../test/test.proto", "/dev/null", ["../test"]).
 
 test_encode_message() ->
     %% Message Test1 with value a = 150
@@ -202,4 +206,34 @@ test_decode_dot_syntax_msg() ->
     Expected = [{k,{1,
                    {message,fun test__test5__test6:encode/1},
                    [{f,{1,uint32,150}}]}}],
+    ?assertEqual(Expected, Result).
+
+test_encode_imported_msg() ->
+    Message = [{l,{1,
+                   {message,fun other__msg1:encode/1},
+                   [{a,{1,uint32,150}}]}}],
+    Result = list_to_binary(test__test11:encode(Message)),
+    ?assertEqual(<<10,3,8,150,1>>, Result).
+
+test_decode_imported_msg() ->
+    Payload = <<10,3,8,150,1>>,
+    Result = test__test11:decode(Payload),
+    Expected = [{l,{1,
+                   {message,fun other__msg1:encode/1},
+                   [{a,{1,uint32,150}}]}}],
+    ?assertEqual(Expected, Result).
+
+test_encode_nested_imported_msg() ->
+    Message = [{m,{1,
+                   {message,fun other__msg1__msg3:encode/1},
+                   [{b,{1,uint32,150}}]}}],
+    Result = list_to_binary(test__test12:encode(Message)),
+    ?assertEqual(<<10,3,8,150,1>>, Result).
+
+test_decode_nested_imported_msg() ->
+    Payload = <<10,3,8,150,1>>,
+    Result = test__test12:decode(Payload),
+    Expected = [{m,{1,
+                   {message,fun other__msg1__msg3:encode/1},
+                   [{b,{1,uint32,150}}]}}],
     ?assertEqual(Expected, Result).

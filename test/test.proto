@@ -1,5 +1,8 @@
 package Test;
 
+import "other.proto";
+import "another.proto";
+
 message Test1 {
     required uint32 a = 1;
 }
@@ -41,4 +44,12 @@ message Test9 {
 
 message Test10 {
     required Test5.Test6 k = 1;
+}
+
+message Test11 {
+    required Other.Msg1 l = 1;
+}
+
+message Test12 {
+    required Other.Msg1.Msg3 m = 1;
 }
