@@ -6,4 +6,6 @@ deps
 ebin
 src/proto_grammar.erl
 test/test__*
+test/other__*
+test/another__*
 *.swp

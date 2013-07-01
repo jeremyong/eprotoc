@@ -2,11 +2,11 @@
 
 -export([
          generate_parser/0,
-         process_file/2,
+         process_file/3,
          read_and_scan/1,
          generate_code/1,
          output_results/2,
-         parse_file/1,
+         parse_file/3,
          reserved_words/1,
          atom_to_name/1
         ]).
@@ -14,27 +14,63 @@
 generate_parser() ->
     yecc:file("src/proto_grammar.yrl").
 
-%% @doc Processes a proto file in three steps. First, it parses the proto file
+%% @doc Processes a proto file in four steps. First, it parses the proto file
 %% and generates the code. Next, it deletes existing modules that have been generated
 %% before. Last, it outputs the results of the generated code to the supplied directory.
--spec process_file(list(), list()) -> ok.
-process_file(File, Outdir) ->
-    Result = generate_code(File),
+-spec process_file(list(), list(), list()) -> ok.
+process_file(File, Outdir, ImportDirs) ->
+    Proto = parse_file(File, Outdir, ImportDirs),
+    Result = generate_code(Proto),
     delete_existing_files(Outdir, Result),
     output_results(Outdir, Result).
 
--spec generate_code(list()) -> list().
-generate_code(File) ->
-    {ok, Proto} = parse_file(File),
+find_file(_, []) ->
+    error;
+find_file(I, [Path | ImportDirs]) ->
+    File = Path ++ "/" ++ I,
+    case filelib:is_file(File) of
+        true ->
+            File;
+        false ->
+            find_file(I, ImportDirs)
+    end.
+
+%% Adds a tokenized version of the imported files into the parsed file and
+%% generates code for the imports.
+-spec handle_imports(tuple(), list(), list()) -> tuple().
+handle_imports({Name, Imports, L}, Outdir, ImportDirs) ->
+    Imported = 
+        lists:foldl(fun(Import, Acc) ->
+                            case find_file(Import, ImportDirs) of
+                                error ->
+                                    throw(Import ++ " not found");
+                                File ->
+                                    {ImportName, Imports1, L1} = parse_file(File, Outdir, ImportDirs),
+                                    case [ImportName == I || {I, _, _} <- Acc] of
+                                        [] ->
+                                            Result = generate_code({ImportName, Imports1, L1}),
+                                            delete_existing_files(Outdir, Result),
+                                            output_results(Outdir, Result),
+                                            Acc ++ [{ImportName, [], L1}| Imports1];
+                                        _ ->
+                                            Acc ++ Imports1
+                                    end
+                            end
+                    end, [], Imports),
+    {Name, Imported, L}.
+
+-spec generate_code(tuple()) -> list().
+generate_code(Proto) ->
     PackageName = atom_to_name(element(1, Proto)),
-    Package = element(2, Proto),
+    Package = element(3, Proto),
     {_, Result} = peel(Package, {PackageName, [], []}, [], Proto),
     Result.
 
--spec parse_file(list()) -> {ok, tuple()}.
-parse_file(File) ->
+-spec parse_file(list(), list(), list()) -> tuple().
+parse_file(File, Outdir, ImportDirs) ->
     Tokens = read_and_scan(File),
-    proto_grammar:parse(Tokens).
+    {ok, Proto} = proto_grammar:parse(Tokens),
+    handle_imports(Proto, Outdir, ImportDirs).
 
 %% @doc Reads a file into memory and scans it, deleting comments along the way.
 -spec read_and_scan(list()) -> list().
@@ -45,8 +81,8 @@ read_and_scan(File) ->
     StripComments1 = re:replace(StripComments, "//.*\\n", "",
                                 [global, {return, list}]),
     {ok, Tokens, _} = erl_scan:string(StripComments1, 1,
-                        {reserved_word_fun, fun reserved_words/1}
-                       ),
+                                      {reserved_word_fun, fun reserved_words/1}
+                                     ),
     Tokens.
 
 delete_existing_files(Dir, [{Module, _}|Rest]) ->
@@ -80,6 +116,7 @@ output_results(Dir, [{Module,Text}|Rest]) ->
 %% hidden
 get_filepath(Dir, File) ->
     Dir ++ "/" ++ File ++ ".erl".
+
 
 %% @doc Hidden. MFs refers to messages or fields (they may be at the same nesting level.
 %% The second argument is a nesting accumulator of the form:
@@ -324,12 +361,12 @@ generate_message_types([{field, _, Type, FieldAtom, _, _}|Rest],
     generate_message_types(Rest, Acc1, Enums, Messages, Proto).
 
 %% Search the messages of parsed proto file for the nested Enum definition.
--spec enum_search(term(), list(), list()) -> {list(),list()} | false.
-enum_search({nested,Inside,Type}, Msgs, Acc) ->
+-spec enum_search(term(), list(), list()) -> {list(), list()} | false.
+enum_search({nested, Inside, Type}, Msgs, Acc) ->
     case lists:keyfind(Inside, 2, Msgs) of
         {message, _, {Enums, Msgs1}} ->
             case Type of
-                {nested,_,_} ->
+                {nested, _, _} ->
                     enum_search(Type, Msgs1, Acc ++ "__" ++ atom_to_name(Inside));
                 _ ->
                     enum_search(Type, Enums, Acc ++ "__" ++ atom_to_name(Inside))
@@ -347,7 +384,7 @@ enum_search(Type, Enums, Acc) ->
 
 %% Search the messages of parsed proto file for the nested Message definition.
 -spec message_search(term(), list(), list()) -> list() | false.
-message_search({nested,Inside,Type}, Msgs, Acc) ->
+message_search({nested, Inside, Type}, Msgs, Acc) ->
     case lists:keyfind(Inside, 2, Msgs) of
         {message, _, {_, Msgs1}} ->
             message_search(Type, Msgs1, Acc ++ atom_to_name(Inside) ++ "__");
@@ -362,24 +399,43 @@ message_search(Type, Msgs, Acc) ->
             false
     end.
 
-nested_atom_to_name({nested,Inside,Type},Acc) ->
+nested_atom_to_name({nested, Inside, Type}, Acc) ->
     nested_atom_to_name(Type,Acc ++ atom_to_name(Inside) ++ "__");
-nested_atom_to_name(Type,Acc) ->
+nested_atom_to_name(Type, Acc) ->
     Acc ++ atom_to_name(Type).
 
-get_field_type({nested,Inside,Type}, _, _, Proto) ->
-    PackageName = atom_to_name(element(1,Proto)),
-    Msgs = element(2,element(2,Proto)),
-    case {message_search({nested,Inside,Type}, Msgs, PackageName ++ "__"),
-          enum_search({nested,Inside,Type}, Msgs, PackageName)} of
-        {false,false} ->
-            throw("Nested message type or enum " ++ nested_atom_to_name({nested,Inside,Type},"") ++ " not found.");
-        {Level,false} ->
-            "{message, fun " ++ Level ++ ":decode/1, fun " ++ Level ++ ":encode/1}";
-        {false,{Level,Enum}} ->
-            "{enum, fun " ++ Level ++ ":" ++ Enum ++ "_enum/1}";
-        {_,_} ->
-            throw("Ambiguous messagae or enum type " ++ Type ++ ".")
+get_field_type({nested, Inside, Type}, _, _, Proto) ->
+    case lists:keysearch(Inside, 1, element(2, Proto)) of
+        false ->
+            PackageName = atom_to_name(element(1, Proto)),
+            Msgs = element(2, element(3, Proto)),
+            case {message_search({nested, Inside, Type}, Msgs, PackageName ++ "__"),
+                  enum_search({nested, Inside, Type}, Msgs, PackageName)} of
+                {false, false} ->
+                    throw("Nested message type or enum " ++ 
+                              nested_atom_to_name({nested, Inside, Type}, "") ++ " not found.");
+                {Level, false} ->
+                    "{message, fun " ++ Level ++ ":decode/1, fun " ++ Level ++ ":encode/1}";
+                {false, {Level, Enum}} ->
+                    "{enum, fun " ++ Level ++ ":" ++ Enum ++ "_enum/1}";
+                {_, _} ->
+                    throw("Ambiguous message or enum type " ++ Type ++ ".")
+            end;
+        {value, Proto1} ->
+            case Type of
+                %% Start searching the imported file for the field type.
+                {nested, _, _} ->
+                    get_field_type(Type, [], [], Proto1);
+                %% Special case. Message is at top level of imported file.
+                _ ->
+                    case lists:keyfind(Type, 2, element(2, element(3, Proto1))) of
+                        false ->
+                            throw("Imported message " ++ atom_to_name(Type) ++ " not found.");
+                        _ ->
+                            Level = atom_to_name(Inside) ++ "__" ++ atom_to_name(Type),
+                            "{message, fun " ++ Level ++ ":decode/1, fun " ++ Level ++ ":encode/1}"
+                    end
+            end
     end;
 get_field_type(TypeAtom, Enums, Messages, _) ->
     Type = atom_to_name(TypeAtom),
@@ -411,6 +467,7 @@ reserved_words(packed) -> true;
 reserved_words(default) -> true;
 reserved_words(true) -> true;
 reserved_words(false) -> true;
+reserved_words(import) -> true;
 reserved_words(_) -> false.
 
 atom_to_name(Atom) ->
