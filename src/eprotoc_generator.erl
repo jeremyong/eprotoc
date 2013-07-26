@@ -189,7 +189,7 @@ generate_field(Rule, Name, Num, Opts, Type) ->
                         undefined when Rule =:= repeated ->
                             "[]";
                         D when is_atom(D) ->
-                            atom_to_list(Default);
+                            atom_to_name(D);
                         D when is_integer(D) ->
                             integer_to_list(D);
                         D when is_list(D) ->
