@@ -50,7 +50,7 @@ will output the module `foo__bar.erl` with the functions
 
 ```erlang
 fun g_zap/1,
-fun s_zap/1,
+fun s_zap/2,
 fun encode/1,
 fun decode/1
 ```
