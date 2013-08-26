@@ -93,6 +93,11 @@ generate_field(Rule, Name, Num, Opts, Type) ->
 %% @end
 generate_message(Fields, Enums, Messages, Proto) ->
     FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
+    generate_message_fields(FieldsOnly, Enums, Messages, Proto).
+
+generate_message_fields([], _, _, _) ->
+    "";
+generate_message_fields(FieldsOnly, Enums, Messages, Proto) ->
     {FieldRules, RuleString} = generate_message_rules(FieldsOnly, {[],""}),
     GenGets = generate_gen_gets(FieldsOnly, ""),
     GenSets = generate_gen_sets(FieldsOnly, ""),
