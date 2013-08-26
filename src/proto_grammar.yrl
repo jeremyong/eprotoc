@@ -54,7 +54,8 @@ field_num -> integer : value_of('$1').
 options -> option : ['$1'].
 options -> option ',' options : ['$1'|'$3'].
 
-option -> packed '=' atom : {packed, value_of('$3')}.
+option -> packed '=' true : {packed, true}.
+option -> packed '=' false : {packed, false}.
 option -> default '=' integer : {default, value_of('$3')}.
 option -> default '=' float : {default, value_of('$3')}.
 option -> default '=' string : {default, value_of('$3')}.
