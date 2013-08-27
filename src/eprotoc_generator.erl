@@ -6,7 +6,7 @@
          process_file/4,
          read_and_scan/1,
          generate_code/2,
-         output_results/2,
+         output_results/3,
          parse_file/4,
          reserved_words/1,
          atom_to_name/1
@@ -31,8 +31,9 @@ process_file(File, Outdir, ImportDirs, Codegen) ->
     {module, _} = code:ensure_loaded(Codegen),
     Proto = parse_file(File, Outdir, ImportDirs, Codegen),
     Result = generate_code(Proto, Codegen),
-    delete_existing_files(Outdir, Result),
-    output_results(Outdir, Result).
+    Ext = Codegen:file_ext(),
+    delete_existing_files(Outdir, Result, Ext),
+    output_results(Outdir, Result, Ext).
 
 find_file(_, []) ->
     error;
@@ -59,8 +60,9 @@ handle_imports({Name, Imports, L}, Outdir, ImportDirs, Codegen) ->
                                     case [ImportName == I || {I, _, _} <- Acc] of
                                         [] ->
                                             Result = generate_code({ImportName, Imports1, L1}, Codegen),
-                                            delete_existing_files(Outdir, Result),
-                                            output_results(Outdir, Result),
+                                            Ext = Codegen:file_ext(),
+                                            delete_existing_files(Outdir, Result, Ext),
+                                            output_results(Outdir, Result, Ext),
                                             Acc ++ [{ImportName, [], L1}| Imports1];
                                         _ ->
                                             Acc ++ Imports1
@@ -95,23 +97,23 @@ read_and_scan(File) ->
                                      ),
     Tokens.
 
-delete_existing_files(Dir, [{Module, _}|Rest]) ->
-    Filepath = get_filepath(Dir, Module),
+delete_existing_files(Dir, [{Module, _}|Rest], Ext) ->
+    Filepath = get_filepath(Dir, Module, Ext),
     case filelib:is_file(Filepath) of
         false ->
             ok;
         true ->
             file:delete(Filepath)
     end,
-    delete_existing_files(Dir, Rest);
-delete_existing_files(_, []) ->
+    delete_existing_files(Dir, Rest, Ext);
+delete_existing_files(_, [], _) ->
     ok.
 
-output_results(Dir, []) ->
+output_results(Dir, [], _) ->
     io:format("Output finished to directory ~p~n", [Dir]),
     ok;
-output_results(Dir, [{Module,Text}|Rest]) ->
-    Filepath = get_filepath(Dir, Module),
+output_results(Dir, [{Module,Text}|Rest], Ext) ->
+    Filepath = get_filepath(Dir, Module, Ext),
     case filelib:is_file(Filepath) of
         false ->
             file:write_file(Filepath,
@@ -121,11 +123,11 @@ output_results(Dir, [{Module,Text}|Rest]) ->
             ok
     end,
     file:write_file(Filepath, Text, [append]),
-    output_results(Dir, Rest).
+    output_results(Dir, Rest, Ext).
 
 %% hidden
-get_filepath(Dir, File) ->
-    Dir ++ "/" ++ File ++ ".erl".
+get_filepath(Dir, File, Ext) ->
+    Dir ++ "/" ++ File ++ Ext.
 
 
 %% @doc Hidden. MFs refers to messages or fields (they may be at the same nesting level.
