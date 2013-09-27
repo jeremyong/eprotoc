@@ -233,11 +233,8 @@ generate_field(Rule, Name, Num, Opts, Type) ->
     Getter ++ Setter.
 
 %% @doc Generates forward and reverse lookups for simplicity.
-generate_enum(Name, [{FieldAtom, Value}], Acc) ->
-    Field = atom_to_name(FieldAtom),
-    Acc1 = Acc ++ Name ++ "_enum(" ++ Field ++ ") -> " ++ Value ++ ";\n",
-    Acc2 = Acc1 ++ Name ++ "_enum(" ++ Value ++ ") -> " ++ Field ++ ";\n",
-    Acc2 ++ Name ++ "_enum(_) -> undefined.\n\n";
+generate_enum(Name, [], Acc) ->
+    Acc ++ Name ++ "_enum(_) -> undefined.\n\n";
 generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
     Field = atom_to_name(FieldAtom),
     Acc1 = Acc ++ Name ++ "_enum(" ++ Field ++ ") -> " ++ Value ++ ";\n",
