@@ -241,6 +241,8 @@ generate_enum(Name, [{FieldAtom, Value}|Fields], Acc) ->
     Acc2 = Acc1 ++ Name ++ "_enum(" ++ Value ++ ") -> " ++ Field ++ ";\n",
     generate_enum(Name, Fields, Acc2).
 
+generate_message([], _, _, _) ->
+    "";
 generate_message(Fields, Enums, Messages, Proto) ->
     FieldsOnly = lists:filter(fun(Elem) -> element(1, Elem) == field end, Fields),
     {FieldRules, RuleString} = generate_message_rules(FieldsOnly, {[],""}),
