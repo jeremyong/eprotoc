@@ -474,4 +474,10 @@ atom_to_name(Atom) ->
     UnderScoreName = re:replace(PascalCaseName,
                                 "(.+)([A-Z])", "\\1_\\2",
                                 [ungreedy, global, {return, list}]),
-    string:to_lower(UnderScoreName).
+    Name = string:to_lower(UnderScoreName),
+    case erl_scan:reserved_word(list_to_atom(Name)) of
+        true ->
+            "'" ++ Name ++ "'";
+        _ ->
+            Name
+    end.
